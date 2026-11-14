@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {WebSocket} from 'ws';
 import {createApplication} from '../server/application.mjs';
 import {createMemoryBackend,createMemoryStore,createRedisStore} from '../server/room-store.mjs';
+import {createConnection} from '../public/connection.js';
 
 async function exerciseSharedRooms(t,stores){
  let clock=Date.now();
@@ -63,4 +64,23 @@ test('cloud endpoint fails closed when Redis is missing',async t=>{
  const app=createApplication({requireRedis:true,ice:[]});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');t.after(()=>app.close());
  const response=await fetch(`http://127.0.0.1:${app.server.address().port}/api/live`);
  assert.equal(response.status,503);assert.deepEqual(await response.json(),{status:'unavailable'});
+});
+
+test('automatic Function rotation reconnects without losing the singer or queued song',async t=>{
+ const app=createApplication({ice:[],rotateAfterMs:250});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+ const values=new Map(),hellos=[],states=[];
+ const connection=createConnection({room:'rotation',url:`ws://127.0.0.1:${app.server.address().port}/api/live?room=rotation`,WebSocketClass:WebSocket,
+  storage:{getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},
+  onHello:m=>hellos.push(m),onMessage:m=>{if(m.type==='state')states.push(m);},
+ });
+ t.after(async()=>{connection.close();await app.close();});
+ async function until(predicate){const end=Date.now()+4000;while(!predicate()){if(Date.now()>end)throw new Error('Rotation did not recover');await new Promise(r=>setTimeout(r,5));}}
+ connection.connect();await until(()=>hellos.length===1);
+ const id=hellos[0].id;
+ connection.send({type:'queue',video:'abcdefghijk',title:'Keep singing'});
+ await until(()=>states.some(s=>s.song?.owner===id));
+ connection.send({type:'queue',video:'lmnopqrstuv',title:'Keep waiting'});
+ await until(()=>states.some(s=>s.queue.length===1));
+ await until(()=>hellos.length>=2&&states.at(-1)?.queue.length===1);
+ assert.equal(hellos[1].id,id);assert.equal(states.at(-1).song.owner,id);assert.equal(states.at(-1).song.title,'Keep singing');
 });
