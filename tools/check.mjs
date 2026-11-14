@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-const excluded = new Set(['node_modules', '.git', '.codex', '.agents', 'source-assets']);
+const excluded = new Set(['node_modules', '.git', '.codex', '.agents', 'source-assets', '.deploy-repo', '.vercel', 'dist']);
 let checked = 0;
 async function check(directory) {
   for (const entry of await readdir(directory, {withFileTypes: true})) {

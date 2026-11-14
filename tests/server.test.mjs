@@ -28,7 +28,7 @@ test('two users receive validated movement, authoritative jumps and seat resets'
  assert.equal(head.status,200);assert.ok(Number(head.headers.get('content-length'))>0);assert.equal((await head.arrayBuffer()).byteLength,0);
  async function connect(){
   const ws=new WebSocket(`ws://127.0.0.1:${port}/live?room=motion-test`),messages=[];
-  ws.on('message',raw=>messages.push(JSON.parse(raw)));await once(ws,'open');
+  ws.on('message',raw=>messages.push(JSON.parse(raw)));await once(ws,'open');ws.send(JSON.stringify({type:'join'}));
   t.after(()=>ws.close());return {ws,messages};
  }
  async function wait(client,predicate){

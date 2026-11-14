@@ -1,13 +1,17 @@
 {
   "dependencies": {
+    "redis": "^6.3.1",
     "three": "^0.187.0",
     "ws": "^8.23.0"
   },
   "name": "rap-am",
   "private": true,
-  "engines": {"node": ">=22"},
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "node server.mjs",
+    "build:static": "node tools/build-static.mjs",
     "test": "node --test tests/*.test.mjs",
     "prepare-motions": "node tools/prepare-motions.mjs",
     "prepare-mannequin": "node tools/prepare-mannequin.mjs",

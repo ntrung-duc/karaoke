@@ -5,7 +5,7 @@ import {WebSocket} from 'ws';
 import {createApplication} from '../server/application.mjs';
 
 test('rooms isolate users and queue; only the singer advances; disconnect advances the queue', async t => {
-  const app = createApplication({ice: []});
+  const app = createApplication({ice: [],resumeGraceMs:0});
   app.server.listen(0, '127.0.0.1');
   await once(app.server, 'listening');
   t.after(() => app.close());
@@ -15,6 +15,7 @@ test('rooms isolate users and queue; only the singer advances; disconnect advanc
     const messages = [];
     ws.on('message', raw => messages.push(JSON.parse(raw)));
     await once(ws, 'open');
+    ws.send(JSON.stringify({type:'join'}));
     return {ws, messages};
   }
   async function wait(client, predicate) {

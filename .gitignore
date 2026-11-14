@@ -1,5 +1,7 @@
 node_modules/
 .deploy-repo/
+dist/
+.vercel/
 tools/source-assets/
 *.tmp.html
 *.tmp.js

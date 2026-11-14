@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "fluid": true,
+  "regions": ["sin1"],
+  "buildCommand": "npm run build:static",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/live.mjs": { "maxDuration": 300 }
+  },
+  "rewrites": [
+    { "source": "/live", "destination": "/api/live" },
+    { "source": "/healthz", "destination": "/api/live" }
+  ]
+}

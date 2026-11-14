@@ -2,8 +2,9 @@ import {buildHall} from './hall.js';
 import {roomName} from './session.js';
 import {faceIndex,skinIndex,SKINS} from './avatar-settings.js';
 import {createFacePicker} from './faces.js';
+import {createConnection} from './connection.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
-let id='',socket,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',retry,connected=false;
+let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',connected=false;
 let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
 let chosenSkin=skinIndex(Number(localStorage.getItem('rap-skin')||0));
 const skinPicker=$('#skin-picker');
@@ -15,7 +16,7 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
 });
 facePicker.select(chosenFace);
 const peers=new Map(),notice=t=>$('#notice').textContent=t;
-function send(m){if(socket?.readyState===1)socket.send(JSON.stringify(m))}
+function send(m){return connection?.send(m)}
 let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){$('#angle').textContent='Trình duyệt cần bật WebGL để xem nhà hát';console.error(e)}
 function stopMic(){stream?.getTracks().forEach(t=>t.stop());stream=null;for(const entry of peers.values())entry.pc.close();peers.clear()}
 function link(other){
@@ -34,7 +35,7 @@ const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
  const old=song;song=m.song;users=m.users;if(song&&!yt.isConnected)document.head.append(yt);offset=m.now-Date.now();
- if(old?.key!==song?.key||(!users.find(u=>u.id===song?.owner)?.mic&&!stream))stopMic();
+ if(old?.key!==song?.key||stream&&song?.owner!==id||(!users.find(u=>u.id===song?.owner)?.mic&&!stream))stopMic();
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){e.pc.close();peers.delete(pid)}
  hall?.users(users,song?.owner,m.now);hall?.media(!!song);const mine=song?.owner===id,me=users.find(u=>u.id===id);
  facePicker.select(me?.face??chosenFace);
@@ -44,13 +45,24 @@ function render(m){
  const ownerName=s=>users.find(u=>u.id===s.owner)?.name||'Khách';
  if(song)row($('#songs'),'♫　'+song.title+' · '+ownerName(song));else row($('#songs'),'Sân khấu đang trống.',true);
  m.queue.forEach((s,i)=>row($('#songs'),(i+1)+'. '+s.title+' · '+ownerName(s),true));
- if(stream&&mine)users.filter(u=>u.id!==id).forEach(u=>offer(u.id).catch(()=>notice('Chưa kết nối được mic tới một người nghe.')));
+ if(stream&&mine&&me?.mic)users.filter(u=>u.id!==id).forEach(u=>offer(u.id).catch(()=>notice('Chưa kết nối được mic tới một người nghe.')));
  if(old?.key!==song?.key){notice('');sync()}
 }
-function connect(){if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}socket=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/live?room='+encodeURIComponent(room));
- socket.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='hello'){id=m.id;ice=m.ice;connected=true;$('#status').textContent='●　Trực tuyến';send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin})}
- else if(m.type==='state')render(m);else if(m.type==='pose')hall?.peer(m.user);else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'))};
- socket.onclose=()=>{connected=false;stopMic();song=null;hall?.media(false);sync();$('#status').textContent='Đang kết nối lại';clearTimeout(retry);retry=setTimeout(connect,2200)}}
+function connect(){
+ if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
+ connection=createConnection({room,
+  onHello(m){id=m.id;ice=m.ice;connected=true;hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin});if(stream)send({type:'mic',on:true});},
+  onMessage(m){if(m.type==='state')render(m);else if(m.type==='pose')hall?.peer(m.user);else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
+  onStatus(status){
+   if(status==='connected'){$('#status').textContent='●　Trực tuyến';return;}
+   connected=false;
+   // Keep capture and song time across Function rotation. Rebuild peers only
+   // after the room acknowledges mic, so listeners see the state before offers.
+   if(stream){for(const entry of peers.values())entry.pc.close();peers.clear();}
+   $('#status').textContent=status==='connecting'?'Đang kết nối':'Đang kết nối lại';
+  },onError:notice,
+ });connection.connect();
+}
 $('#name').value=localStorage.getItem('rap-name')||'Khách';$('#name').onchange=()=>{localStorage.setItem('rap-name',$('#name').value);send({type:'name',value:$('#name').value})};
 $('#form').onsubmit=e=>{e.preventDefault();if(!connected)return notice('Đang chờ kết nối phòng.');let v;try{const u=new URL($('#url').value.trim());if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(u.hostname))v=u.searchParams.get('v')||u.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/)?.[1];else if(u.hostname==='youtu.be')v=u.pathname.slice(1)}catch{}if(!/^[\w-]{11}$/.test(v||''))return notice('Hãy dán liên kết đến một video YouTube.');send({type:'queue',video:v,title:$('#title').value.trim()||'Karaoke · '+v});e.target.reset();notice('Đã đăng ký bài hát.')};
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
