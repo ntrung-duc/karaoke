@@ -59,8 +59,13 @@ async function exerciseSharedRooms(t,stores){
  const both=await wait(b,m=>m.type==='state'&&m.users.length===2);
  assert.equal(new Set(both.users.map(u=>u.seat)).size,2,'concurrent joins allocate distinct seats');
  assert.ok(!JSON.stringify(both).includes(a.hello.resumeToken),'resume secrets never reach other players');
- a.ws.send(JSON.stringify({type:'appearance',face:6,skin:4}));
- await wait(b,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.skin===4);
+ a.ws.send(JSON.stringify({type:'appearance',face:6,skin:4,shirt:'#ff4477'}));
+ const dressed=await wait(b,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.skin===4);
+ assert.equal(dressed.users.find(u=>u.id===id).shirt,'#ff4477');
+ a.ws.send(JSON.stringify({type:'appearance',shirt:'invalid'}));
+ a.ws.send(JSON.stringify({type:'name',value:'Shirt check'}));
+ const validated=await wait(b,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.name==='Shirt check');
+ assert.equal(validated.users.find(u=>u.id===id).shirt,'#ff4477');
  a.ws.send(JSON.stringify({type:'queue',video:'abcdefghijk',title:'Keep this song'}));
  const singing=await wait(b,m=>m.type==='state'&&m.song?.owner===id),songKey=singing.song.key;
  b.ws.send(JSON.stringify({type:'queue',video:'lmnopqrstuv',title:'Next'}));
@@ -72,6 +77,7 @@ async function exerciseSharedRooms(t,stores){
  assert.equal(resumed.hello.id,id,'a different instance restores the same identity');
  const restored=await wait(resumed,m=>m.type==='state'&&m.users.length===2&&m.song?.key===songKey);
  assert.equal(restored.users.find(u=>u.id===id).face,6);assert.equal(restored.users.find(u=>u.id===id).skin,4);
+ assert.equal(restored.users.find(u=>u.id===id).shirt,'#ff4477');
  assert.equal(restored.queue.length,1);
  const isolated=await connect(0,undefined,'another');
  const separate=await wait(isolated,m=>m.type==='state');assert.equal(separate.users.length,1);assert.equal(separate.song,null);

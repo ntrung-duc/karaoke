@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {TAKEOFF,LANDING} from './motion.js';
-import {faceIndex,skinColor} from './avatar-settings.js';
+import {faceIndex,skinColor,shirtColor} from './avatar-settings.js';
 import {faceTexture} from './faces.js';
 import {createToyPart} from './toy-avatar.js';
 
@@ -15,6 +15,9 @@ export function loadMotions() {
 export function createAvatar(color,material) {
  const body=new T.Group(),rig=new T.Group(),head=new T.Group(),nodes=new Map();
  const skin=new T.MeshStandardMaterial({color:skinColor(0),roughness:.43,emissive:skinColor(0),emissiveIntensity:.045});body.add(rig);
+ const shirt=new T.MeshStandardMaterial({color:shirtColor(),roughness:.85});
+ const pants=new T.MeshStandardMaterial({color:'#263449',roughness:.9});
+ const shoes=new T.MeshStandardMaterial({color:'#eeeeef',roughness:.7});
  // A camera-space soft fill keeps relief readable away from the stage light.
  // Apply it only to skin, without introducing a light per user or lighting the hall.
  skin.onBeforeCompile=shader=>{
@@ -27,7 +30,8 @@ export function createAvatar(color,material) {
  let mixer,actions={},current=null,failed=false,disposed=false,selectedFace=-1,decal;
  function mesh(name,size) {
   const node=new T.Group();node.name=name;rig.add(node);nodes.set(name,node);
-  const part=createToyPart(name,size,skin);node.add(part);
+  const fabric=name==='torso'||name.startsWith('upperArm')?shirt:name==='hips'||name.startsWith('thigh')||name.startsWith('shin')?pants:name.startsWith('foot')?shoes:skin;
+  const part=createToyPart(name,size,fabric);node.add(part);
   if(name==='head'){
    // Baked head faces +Z locally, then turns with the source head motion.
    node.add(head);
@@ -101,11 +105,11 @@ export function createAvatar(color,material) {
    basis.makeBasis(xAxis,yAxis,zAxis);node.quaternion.setFromRotationMatrix(basis);
   }
  }
- return {body,head,ready,setFace,setSkin(index){skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch){
+ return {body,head,ready,setFace,setShirt(value){shirt.color.set(shirtColor(value));},setSkin(index){skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch){
   if(disposed||!mixer&&!failed)return;
   for(const node of nodes.values())if(node.userData.motionX!==undefined)node.position.x=node.userData.motionX;
   setState(state);if(state==='sit')seated();else mixer?.update(dt);
   alignParts();
   head.rotation.set(-pitch,yaw,0,'YXZ');
- },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);skin.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};
+ },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);for(const material of [skin,shirt,pants,shoes])material.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};
 }

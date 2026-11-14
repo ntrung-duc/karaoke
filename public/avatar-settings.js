@@ -23,3 +23,7 @@ export const SKINS = [
 export const isSkin=value=>Number.isInteger(value)&&value>=0&&value<SKINS.length;
 export const skinIndex=value=>isSkin(value)?value:0;
 export const skinColor=value=>SKINS[skinIndex(value)].color;
+
+export const DEFAULT_SHIRT='#5588cc';
+export const isShirt=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+export const shirtColor=value=>isShirt(value)?value.toLowerCase():DEFAULT_SHIRT;

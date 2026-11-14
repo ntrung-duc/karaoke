@@ -2,4 +2,5 @@
 
 .appearance{margin:18px 0 0;padding:0;border:0;min-width:0}.appearance legend{font-size:14px;font-weight:600;margin-bottom:10px}#face-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.face-option{display:grid;gap:5px;justify-items:center;padding:7px 4px;background:#e4e5ed;color:#252434;border:2px solid transparent;min-width:0}.face-option canvas{width:100%;height:auto;max-width:56px;aspect-ratio:1;position:static!important}.face-option span{font-size:10px}.face-option:hover{background:#fff}.face-option[aria-pressed=true]{border-color:#c7aff8;background:#fff;box-shadow:0 0 0 2px #c7aff830}.appearance-help{font-size:12px;line-height:1.5;color:#bbb9cb;margin:10px 0 0}
 #skin-picker{width:100%;font:inherit;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;padding:10px}#skin-picker:focus-visible{outline:2px solid #c1adff}
+#shirt-picker{height:44px;padding:5px;cursor:pointer}
 

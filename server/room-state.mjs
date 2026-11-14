@@ -2,7 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {seats,position,clearSeat} from '../public/layout.js';
 import {gaits,jumpPose} from '../public/motion.js';
 import {MAX_QUEUE,MAX_NAME,MAX_TITLE} from '../public/session.js';
-import {isFace,isSkin,wrapYaw} from '../public/avatar-settings.js';
+import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-settings.js';
 
 export const PRESENCE_MS=60000;
 export const RESUME_GRACE_MS=45000;
@@ -39,7 +39,7 @@ export function joinMember(room,{id,connectionId,token,resumeToken},now){
  if(!member){
   if(room.users.size>=80)throw new Error('ROOM_FULL');
   const seat=seats.findIndex((_,index)=>![...room.users.values()].some(u=>u.data.seat===index));
-  const data={id,name:'Khách',seat,...(seats[seat]||{x:0,z:11}),yaw:0,bodyYaw:0,pitch:0,face:0,skin:0,color:Math.floor(Math.random()*6),mic:false,...resetMotion};
+  const data={id,name:'Khách',seat,...(seats[seat]||{x:0,z:11}),yaw:0,bodyYaw:0,pitch:0,face:0,skin:0,shirt:shirtColor(),color:Math.floor(Math.random()*6),mic:false,...resetMotion};
   member={data,tokenDigest:tokenDigest(token)};room.users.set(id,member);
  }else token=resumeToken;
  member.connectionId=connectionId;member.expiresAt=now+PRESENCE_MS;
@@ -76,9 +76,11 @@ export function applyMessage(room,id,connectionId,message,now){
   case 'name':data.name=String(message.value||'Khách').trim().slice(0,MAX_NAME)||'Khách';break;
   case 'appearance':
    if(message.face!==undefined&&!isFace(message.face)||message.skin!==undefined&&!isSkin(message.skin))return {events};
-   if(message.face===undefined&&message.skin===undefined)return {events};
+   if(message.shirt!==undefined&&!isShirt(message.shirt))return {events};
+   if(message.face===undefined&&message.skin===undefined&&message.shirt===undefined)return {events};
    if(message.face!==undefined)data.face=message.face;
    if(message.skin!==undefined)data.skin=message.skin;
+   if(message.shirt!==undefined)data.shirt=shirtColor(message.shirt);
    break;
   case 'seat':
    if(singer)return {events};

@@ -1,12 +1,16 @@
 import {buildHall} from './hall.js';
 import {roomName} from './session.js';
-import {faceIndex,skinIndex,SKINS} from './avatar-settings.js';
+import {faceIndex,skinIndex,SKINS,shirtColor} from './avatar-settings.js';
 import {createFacePicker} from './faces.js';
 import {createConnection} from './connection.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',connected=false;
 let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
 let chosenSkin=skinIndex(Number(localStorage.getItem('rap-skin')||0));
+let chosenShirt=shirtColor(localStorage.getItem('rap-shirt'));
+const shirtPicker=$('#shirt-picker');shirtPicker.value=chosenShirt;
+shirtPicker.oninput=()=>{chosenShirt=shirtColor(shirtPicker.value);hall?.appearance(undefined,undefined,chosenShirt);};
+shirtPicker.onchange=()=>{chosenShirt=shirtColor(shirtPicker.value);localStorage.setItem('rap-shirt',chosenShirt);hall?.appearance(undefined,undefined,chosenShirt);send({type:'appearance',shirt:chosenShirt});};
 const skinPicker=$('#skin-picker');
 SKINS.forEach((skin,index)=>{const option=document.createElement('option');option.value=index;option.textContent=skin.name;skinPicker.append(option);});
 skinPicker.value=chosenSkin;
@@ -51,7 +55,7 @@ function render(m){
 function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
  connection=createConnection({room,
-  onHello(m){id=m.id;ice=m.ice;connected=true;hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin});if(stream)send({type:'mic',on:true});},
+  onHello(m){id=m.id;ice=m.ice;connected=true;hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
   onMessage(m){if(m.type==='state')render(m);else if(m.type==='pose')hall?.peer(m.user);else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
    if(status==='connected'){$('#status').textContent='●　Trực tuyến';return;}

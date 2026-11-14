@@ -4,7 +4,7 @@ import {CSS3DRenderer,CSS3DObject} from '/lib/css.js';
 import {seats,position,clearSeat} from './layout.js';
 import {createAvatar,loadMotions} from './avatar.js';
 import {jumpPose,displacementGait,WALK_SPEED,RUN_SPEED} from './motion.js';
-import {relativeHeadYaw,faceIndex,skinIndex} from './avatar-settings.js';
+import {relativeHeadYaw,faceIndex,skinIndex,shirtColor} from './avatar-settings.js';
 import {createCameraControls} from './camera-controls.js';
 import {standLocally,reconcilePlayer} from './player-state.js';
 import {movementKey} from './input.js';
@@ -42,7 +42,7 @@ export function buildHall(view,send,me){
  a.facing=base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
  a.body.position.y=(singer?1:0)+jump.height;
- const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));
+ const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  a.update(dt,sitting?'sit':jump.state||(moving?u.gait:'idle'),look,u.pitch);
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
@@ -55,7 +55,7 @@ export function buildHall(view,send,me){
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
  self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,reconnect(){dirty=true;},appearance(face,skin){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();
+ const api={owner:null,reconnect(){dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);else if(self)self.jumpAt=u.jumpAt;},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;angle();if(self)pose(self)},seat(){if(!self)return;if(self.seat>=0){stand();first();return}
  const occupied=new Set([...actors.values()].filter(a=>a.user?.seat>=0).map(a=>a.user.seat));const near=seats.map((s,i)=>({i,d:Math.hypot(s.x-self.x,s.z-self.z),free:!occupied.has(i)})).filter(s=>s.free).sort((a,b)=>a.d-b.d)[0];if(near){send({type:'seat',index:near.i});first()}}};
