@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {seats} from './layout.js';
+import {addRecliners} from './recliner.js';
 
 // All architectural boxes are static. Batch them after construction, retaining
 // their world transforms and shadow flags instead of drawing each box alone.
@@ -26,13 +27,13 @@ export function batchStaticBoxes(scene,geometry){
 }
 
 export function createScenery(scene,box,mat){
- const gold='#c39852',wood='#583a2f',red='#a17960',dark='#32232a';
+ const gold='#c39852',wood='#583a2f',dark='#32232a';
  box(0,-.14,4,20,.28,26,'#4b4862');box(0,4,-8,20,8,.3,dark);
  for(const x of [-9.65,9.65]){box(x,3,4,.23,6.3,26,'#b49779');box(x,1.65,4,.27,.07,26,gold);
  for(let z=-6;z<=13;z+=3){box(x*.99,2.9,z,.15,5.8,.11,wood);box(x*.98,3.25,z,.22,.62,.26,'#ffce87')}}
  box(0,.48,-5.25,14,.96,5.7,wood);box(0,.95,-5.25,14,.09,5.7,'#bc9875');box(0,.83,-2.38,14,.06,.05,gold);
  for(const x of [-5.9,5.9])for(let s=0;s<3;s++)box(x,.13*(3-s),-2.22+s*.28,1.8,.26*(3-s),.33,wood);
- for(const x of [-5.35,0,5.35]){const width=x===0?1.65:1.5;box(x,.011,5.5,width,.02,14.4,'#796557');for(const sign of [-1,1])box(x+sign*(width/2-.05),.029,5.5,.025,.012,14.4,gold)}
+ for(const x of [-8,0,8]){const width=x===0?1.65:1.5;box(x,.011,5.5,width,.02,14.4,'#796557');for(const sign of [-1,1])box(x+sign*(width/2-.05),.029,5.5,.025,.012,14.4,gold)}
  for(const z of [-.85,11.1])box(0,.026,z,12.2,.024,1.05,'#796557');
  for(const sign of [-1,1]){
  for(let i=0;i<13;i++){const x=sign*(5.04+i*.175),depth=Math.cos(i*1.45)*.14;box(x,3.85,-7+depth,.2,5.8,.32,i%2?'#762138':'#aa3446')}
@@ -56,7 +57,7 @@ export function createScenery(scene,box,mat){
  const rear=screen(0,3.88,-7.45,8.75,3.7,0),front=screen(1.72,1.85,-2.85,1.78,.67,Math.PI+.3);
  // Raise the singer's monitor above the stage lip; a slim stand meets its frame.
  box(1.72,1.22,-2.85,.08,.46,.08,gold);
- seats.forEach(({x,z})=>{box(x,.38,z,.58,.67,.52,'#473537');box(x,.67,z,1.02,.23,.92,red);box(x,1.03,z+.4,1.06,.83,.23,'#795740');box(x,1.43,z+.4,.99,.045,.24,gold);for(const side of [-1,1])box(x+side*.49,.82,z,.12,.18,.71,wood)});
+ const chairs=addRecliners(scene,seats);
  // Painted end wall, facing the audience when they turn away from the stage.
  const mural=document.createElement('canvas');mural.width=2048;mural.height=640;
  const ink=mural.getContext('2d');ink.fillStyle='#1e1b30';ink.fillRect(0,0,2048,640);
@@ -82,5 +83,5 @@ export function createScenery(scene,box,mat){
  spot.castShadow=true;spot.shadow.bias=-.0003;spot.shadow.normalBias=.018;scene.add(spot,spot.target);
  const fixture=new T.Mesh(new T.CylinderGeometry(.19,.24,.56,12),mat('#33313c'));fixture.position.copy(spot.position);scene.add(fixture);
  const shaft=new T.Mesh(new T.ConeGeometry(1,1,36,1,true),new T.MeshBasicMaterial({color:0xffdaaf,transparent:true,opacity:.035,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending}));scene.add(shaft);
- return {rear,front,poster,hole,spot,shaft,fixture};
+ return {rear,front,poster,hole,spot,shaft,fixture,chairs};
 }

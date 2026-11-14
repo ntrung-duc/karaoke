@@ -2,7 +2,7 @@ import {readFile} from 'node:fs/promises';
 
 // Explicit public surface: never serve project source, secrets or source downloads.
 const files = new Map([
-  ...['index.html', 'app.js', 'connection.js', 'hall.js', 'camera-controls.js', 'player-state.js', 'input.js', 'scenery.js', 'avatar.js', 'avatar-head.js', 'block-avatar.js', 'toy-avatar.js', 'faces.js', 'avatar-settings.js', 'motion.js', 'session.js', 'layout.js', 'style.css']
+  ...['index.html', 'app.js', 'connection.js', 'hall.js', 'camera-controls.js', 'player-state.js', 'input.js', 'scenery.js', 'recliner.js', 'navigation.js', 'avatar.js', 'avatar-head.js', 'block-avatar.js', 'toy-avatar.js', 'faces.js', 'avatar-settings.js', 'motion.js', 'session.js', 'layout.js', 'style.css']
     .map(file => ['/' + file, 'public/' + file]),
   ['/', 'public/index.html'],
   ['/assets/mannequin.glb', 'public/assets/mannequin.glb'],
