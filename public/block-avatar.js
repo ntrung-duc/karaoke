@@ -18,14 +18,18 @@ export function createAvatar(color,material) {
  const shirt=new T.MeshStandardMaterial({color:shirtColor(),roughness:.85});
  const pants=new T.MeshStandardMaterial({color:'#263449',roughness:.9});
  const shoes=new T.MeshStandardMaterial({color:'#eeeeef',roughness:.7});
- // A camera-space soft fill keeps relief readable away from the stage light.
- // Apply it only to skin, without introducing a light per user or lighting the hall.
+ // A camera-space soft fill keeps personal colors readable in the dark hall
+ // without introducing a light per user or lighting the room itself.
  skin.onBeforeCompile=shader=>{
   shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
    totalEmissiveRadiance += diffuseColor.rgb * (0.035 + 0.65 * max(0.0, dot(normal, normalize(vec3(-0.65, 0.85, 0.75)))));
   `);
  };
  skin.customProgramCacheKey=()=> 'toy-skin-fill-v1';
+ for(const garment of [shirt,pants,shoes]){
+  garment.onBeforeCompile=skin.onBeforeCompile;
+  garment.customProgramCacheKey=()=> 'toy-clothing-fill-v1';
+ }
  const yAxis=new T.Vector3(),zAxis=new T.Vector3(),xAxis=new T.Vector3(),front=new T.Vector3(0,0,-1),basis=new T.Matrix4();
  let mixer,actions={},current=null,failed=false,disposed=false,selectedFace=-1,decal;
  function mesh(name,size) {
