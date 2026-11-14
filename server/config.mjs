@@ -5,7 +5,7 @@ export function readConfig(env = process.env) {
   }
   return {
     port,
-    host: env.HOST || '0.0.0.0',
+    host: env.HOST || env.IP || '0.0.0.0',
     ice: env.TURN_URL ? [{urls: env.TURN_URL, username: env.TURN_USER, credential: env.TURN_PASSWORD}] : [],
   };
 }

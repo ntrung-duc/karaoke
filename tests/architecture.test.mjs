@@ -25,6 +25,8 @@ test('nine faces are bounded and head yaw supports every direction independently
 test('configuration and room links fail clearly on invalid input', () => {
   assert.equal(readConfig({}).port, 4173);
   assert.equal(readConfig({PORT: '0'}).port, 0);
+  assert.equal(readConfig({IP:'127.0.0.2'}).host,'127.0.0.2');
+  assert.equal(readConfig({HOST:'127.0.0.1',IP:'127.0.0.2'}).host,'127.0.0.1');
   for (const PORT of ['abc', '-1', '65536', '1.5']) assert.throws(() => readConfig({PORT}));
   assert.equal(roomName(null), 'studio');
   assert.equal(roomName('lop-4_A'), 'lop-4_A');
