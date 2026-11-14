@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "three": "^0.187.0",
+    "ws": "^8.23.0"
+  },
+  "name": "rap-am",
+  "private": true,
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "prepare-motions": "node tools/prepare-motions.mjs",
+    "prepare-mannequin": "node tools/prepare-mannequin.mjs",
+    "check": "node tools/check.mjs"
+  },
+  "type": "module"
+}

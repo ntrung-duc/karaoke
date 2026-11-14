@@ -1,0 +1,61 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createCameraControls,MAX_DISTANCE,FIRST_PERSON_THRESHOLD} from '../public/camera-controls.js';
+import {displacementGait} from '../public/motion.js';
+
+test('first-person WASD uses the viewed direction instead of the old body direction',()=>{
+ const controls=createCameraControls(),head={yaw:0,pitch:0,bodyYaw:0};controls.sync(head);controls.setMode('first',head);
+ for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+  head.yaw=yaw;head.pitch=.9;
+  const angle=controls.movementHeading(head);
+  assert.equal(angle,yaw);
+  const forward={x:-Math.sin(angle),z:-Math.cos(angle)},right={x:Math.cos(angle),z:-Math.sin(angle)};
+  assert.ok(Math.abs(forward.x*(-Math.sin(yaw))+forward.z*(-Math.cos(yaw))-1)<1e-9);
+  assert.ok(Math.abs(right.x*Math.cos(yaw)+right.z*(-Math.sin(yaw))-1)<1e-9);
+ }
+ controls.setMode('avatar',head);assert.equal(controls.movementHeading(head),0);
+});
+
+test('movement animation matches camera-relative travel around a fixed body',()=>{
+ assert.equal(displacementGait(-1,0,0,false),'walkLeft');
+ assert.equal(displacementGait(0,1,0,true),'runBackward');
+ assert.equal(displacementGait(1,0,0,false),'walkRight');
+ assert.equal(displacementGait(0,-1,Math.PI,false),'walkBackward');
+});
+
+test('orbit rotates the third-person camera without changing avatar head or body',()=>{
+  const controls=createCameraControls(),head={yaw:.2,pitch:.1,bodyYaw:0};controls.sync(head);
+  const before={...head};
+  for(let i=0;i<10;i++)assert.equal(controls.turn(.7,.02,head),false);
+  assert.deepEqual(head,before);assert.notEqual(controls.yaw,head.yaw);
+  controls.sync(head);assert.notEqual(controls.yaw,head.yaw,'room updates must not reset an orbit');
+});
+
+test('zooming into first person aligns the head, which then follows the camera',()=>{
+  const controls=createCameraControls(),head={yaw:0,pitch:0,bodyYaw:0};controls.sync(head);
+  controls.turn(-1.2,-.2,head);
+  assert.equal(head.yaw,0);
+  assert.equal(controls.zoom(-1000,head),true);
+  assert.equal(controls.mode,'first');assert.equal(controls.distance,0);
+  assert.equal(head.yaw,controls.yaw);assert.equal(head.pitch,controls.pitch);
+  assert.equal(controls.turn(.3,-.1,head),true);
+  assert.equal(head.yaw,controls.yaw);assert.equal(head.pitch,controls.pitch);assert.equal(head.bodyYaw,0);
+});
+
+test('zooming out restores a local orbit and preserves the last head direction',()=>{
+  const controls=createCameraControls(),head={yaw:0,pitch:0};controls.sync(head);controls.zoom(-1000,head);
+  controls.turn(-.8,.1,head);const before={...head};
+  assert.equal(controls.zoom(120,head),false);assert.equal(controls.mode,'avatar');
+  assert.ok(controls.distance>FIRST_PERSON_THRESHOLD);
+  controls.turn(.9,.2,head);assert.deepEqual(head,before);
+  controls.zoom(100000,head);assert.equal(controls.distance,MAX_DISTANCE);
+});
+
+test('camera button still cycles views and invalid wheel values leave the view intact',()=>{
+  const controls=createCameraControls(),head={yaw:Math.PI,pitch:0};controls.sync(head);
+  controls.cycle(head);assert.equal(controls.mode,'first');
+  controls.cycle(head);assert.equal(controls.mode,'overview');
+  controls.zoom(-1000,head);assert.equal(controls.mode,'overview');
+  controls.cycle(head);assert.equal(controls.mode,'avatar');
+  const before=controls.distance;controls.zoom(NaN,head);controls.zoom(Infinity,head);assert.equal(controls.distance,before);
+});
