@@ -9,7 +9,7 @@ const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 export function createCameraControls(){
   return {
     mode:'avatar',yaw:0,pitch:-.32,distance:DEFAULT_DISTANCE,initialized:false,
-    movementHeading(head){return this.mode==='first'?head.yaw:(head.bodyYaw??0);},
+    movementHeading(head){return this.mode==='first'?head.yaw:this.yaw;},
     sync(head,reset=false){
       if(!this.initialized||reset){
         this.yaw=head.yaw;this.pitch=clamp(head.pitch-(this.mode==='avatar'?.32:0),-1,1);

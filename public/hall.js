@@ -90,7 +90,7 @@ export function buildHall(view,send,me){
   camera.position.y=T.MathUtils.clamp(camera.position.y,.3,7);
  }else camera.rotation.set(self.pitch,self.yaw,0,'YXZ');
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
- if(dirty&&(motionChanged||t-last>75)){send({type:'move',x:self.x,z:self.z,yaw:self.yaw,pitch:self.pitch,gait:self.gait});last=t;dirty=false}
+ if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
  animateActors(dt);focusStage(dt);const monitor=cameraControls.mode!=='overview'&&me()&&api.owner===me()?front:rear;rear.mesh.material=active&&monitor===rear?hole:poster;front.mesh.material=active&&monitor===front?hole:poster;display.visible=active;display.position.set(monitor.x,monitor.y,monitor.z+.015*Math.cos(monitor.rot));display.rotation.y=monitor.rot;display.scale.set(monitor.w/800,monitor.h/450,1);web.render(scene,camera);css.render(overlay,camera);
  }

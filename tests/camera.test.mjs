@@ -13,7 +13,16 @@ test('first-person WASD uses the viewed direction instead of the old body direct
   assert.ok(Math.abs(forward.x*(-Math.sin(yaw))+forward.z*(-Math.cos(yaw))-1)<1e-9);
   assert.ok(Math.abs(right.x*Math.cos(yaw)+right.z*(-Math.sin(yaw))-1)<1e-9);
  }
- controls.setMode('avatar',head);assert.equal(controls.movementHeading(head),0);
+ controls.setMode('avatar',head);assert.equal(controls.movementHeading(head),controls.yaw);
+});
+
+test('third-person WASD follows the orbit immediately without turning the head or body',()=>{
+ const controls=createCameraControls(),head={yaw:0,pitch:0,bodyYaw:0};controls.sync(head);
+ for(const yaw of [Math.PI/2,Math.PI,-Math.PI/2,0]){
+  controls.turn(controls.yaw-yaw,0,head);
+  assert.ok(Math.abs(controls.movementHeading(head)-yaw)<1e-9);
+  assert.equal(head.yaw,0);assert.equal(head.bodyYaw,0);
+ }
 });
 
 test('movement animation matches camera-relative travel around a fixed body',()=>{

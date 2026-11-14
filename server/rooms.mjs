@@ -49,7 +49,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
  }
  const stopUnavailable=store.onUnavailable(()=>{for(const record of clients)record.client.close(1013,'Room storage unavailable');});
  function join(client,key,resumeToken){
-  const record={client,key,connectionId:randomUUID(),id:null,ready:false,closed:false,buffer:[],revision:0,pending:Promise.resolve(),queued:0,alive:true};
+  const record={client,key,connectionId:randomUUID(),id:null,ready:false,closed:false,buffer:[],revision:0,pending:Promise.resolve(),queued:0,alive:true,moveSlot:null};
   clients.add(record);
   function fail(error){
    if(client.readyState===WebSocket.OPEN){send(record,{type:'error',message:error.message==='ROOM_FULL'?'Phòng đã đầy.':'Chưa kết nối được máy chủ phòng. Đang thử lại.'});client.close(1013,'Room unavailable');}
@@ -62,10 +62,15 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
   client.on('message',raw=>{
    let message;try{message=JSON.parse(raw);}catch{return;}
    if(!message||typeof message!=='object'||record.closed)return;
+   // Keep only the newest unsent pose while Redis is busy. Other commands
+   // form barriers so a pose cannot overtake standing, jumping or sitting.
+   if(message.type==='move'&&record.moveSlot){record.moveSlot.message=message;return;}
+   const slot={message};record.moveSlot=message.type==='move'?slot:null;
    if(++record.queued>64){client.close(1008,'Too many messages');return;}
    enqueue(async()=>{
     record.queued--;if(record.closed||!record.id)return;
-    const result=await store.transact(key,room=>applyMessage(room,record.id,record.connectionId,message,now()));
+    if(record.moveSlot===slot)record.moveSlot=null;
+    const result=await store.transact(key,room=>applyMessage(room,record.id,record.connectionId,slot.message,now()));
     if(result.expired)client.close(4001,'Session expired');
     if(result.snapshot)receive(record,{message:result.snapshot});
    });

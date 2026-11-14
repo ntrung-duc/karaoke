@@ -7,6 +7,36 @@ import {createApplication} from '../server/application.mjs';
 import {createMemoryBackend,createMemoryStore,createRedisStore} from '../server/room-store.mjs';
 import {createConnection} from '../public/connection.js';
 
+test('slow storage coalesces queued movement without overtaking seat commands',async t=>{
+ const memory=createMemoryStore();let hold=false,release,entered;
+ const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ const store={...memory,async transact(key,mutate){if(hold){hold=false;entered();await gate;}return memory.transact(key,mutate);}};
+ const app=createApplication({store,ice:[]}),messages=[];
+ app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+ const ws=new WebSocket(`ws://127.0.0.1:${app.server.address().port}/api/live?room=movement`);
+ t.after(async()=>{release();ws.terminate();await app.close();});
+ ws.on('message',raw=>messages.push(JSON.parse(raw)));
+ async function wait(predicate){
+  const deadline=Date.now()+5000;
+  while(Date.now()<deadline){const found=messages.find(predicate);if(found)return found;await new Promise(r=>setTimeout(r,5));}
+  throw new Error('Movement update missing');
+ }
+ await once(ws,'open');const send=message=>ws.send(JSON.stringify(message));send({type:'join'});
+ await wait(m=>m.type==='state');send({type:'seat',index:-1});await wait(m=>m.type==='state'&&m.users[0].seat===-1);
+ hold=true;const move=x=>({type:'move',x,z:0,yaw:0,pitch:0,gait:'walkRight'});
+ send(move(0));await started;
+ for(let i=1;i<=100;i++)send(move(i/100));
+ send({type:'seat',index:2});send(move(8));
+ // A name update acknowledges the entire command sequence.
+ send({type:'name',value:'done'});
+ await new Promise(r=>setTimeout(r,40));release();
+ const final=await wait(m=>m.type==='state'&&m.users[0].name==='done');
+ assert.equal(final.users[0].seat,2);assert.equal(final.users[0].x,1.9);
+ const poses=messages.filter(m=>m.type==='pose');
+ assert.deepEqual(poses.map(m=>m.user.x),[0,1,1.9]);
+ assert.equal(ws.readyState,WebSocket.OPEN,'movement burst must not close the session');
+});
+
 async function exerciseSharedRooms(t,stores){
  let clock=Date.now();
  const apps=stores.map(store=>createApplication({store,now:()=>clock,ice:[],resumeGraceMs:45000}));
