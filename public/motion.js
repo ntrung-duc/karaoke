@@ -1,5 +1,5 @@
 export const WALK_SPEED=2, RUN_SPEED=4;
-export const TAKEOFF=.22, FLIGHT=.78, LANDING=.30;
+export const TAKEOFF=.08, FLIGHT=.70, LANDING=.12;
 export const JUMP_DURATION=TAKEOFF+FLIGHT+LANDING;
 export const JUMP_HEIGHT=.95;
 export const directions=['Forward','ForwardRight','Right','BackwardRight','Backward','BackwardLeft','Left','ForwardLeft'];
@@ -16,8 +16,7 @@ export function displacementGait(dx,dz,bodyYaw,running){
 export function jumpPose(jumpAt,now) {
  const elapsed=(now-jumpAt)/1000;
  if(!jumpAt||elapsed<0||elapsed>=JUMP_DURATION)return {height:0,state:null,elapsed};
- if(elapsed<TAKEOFF)return {height:0,state:'jump',elapsed};
- const flight=elapsed-TAKEOFF;
- if(flight<FLIGHT) return {height:4*JUMP_HEIGHT*(flight/FLIGHT)*(1-flight/FLIGHT),state:'fall',elapsed};
+ const airborne=TAKEOFF+FLIGHT;
+ if(elapsed<airborne){const progress=elapsed/airborne;return {height:4*JUMP_HEIGHT*progress*(1-progress),state:elapsed<TAKEOFF?'jump':'fall',elapsed};}
  return {height:0,state:'land',elapsed};
 }

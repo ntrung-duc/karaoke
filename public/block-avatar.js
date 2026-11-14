@@ -65,12 +65,12 @@ export function createAvatar(color,material) {
   nodes.get('torso').position.set(0,1,0);nodes.get('head').position.set(0,1.55,0);nodes.get('head').rotation.y=Math.PI;
   nodes.get('thighL').position.set(-.17,.36,0);nodes.get('thighR').position.set(.17,.36,0);
  });
- function setState(name){
+ function setState(name,immediate=false){
   if(!mixer||name===current)return;
   if(name==='sit'){for(const action of Object.values(actions))action.stop();current=name;return;}
   const next=actions[name]||actions.idle,old=actions[current];
   next.reset().setEffectiveWeight(1).play();
-  if(old)next.crossFadeFrom(old,.12,false);
+  if(old){if(immediate)old.stop();else next.crossFadeFrom(old,.12,false);}
   current=name;
  }
  function seated(){
@@ -109,10 +109,10 @@ export function createAvatar(color,material) {
    basis.makeBasis(xAxis,yAxis,zAxis);node.quaternion.setFromRotationMatrix(basis);
   }
  }
- return {body,head,ready,setFace,setShirt(value){shirt.color.set(shirtColor(value));},setSkin(index){skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch){
+ return {body,head,ready,setFace,setShirt(value){shirt.color.set(shirtColor(value));},setSkin(index){skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch,immediate=false){
   if(disposed||!mixer&&!failed)return;
   for(const node of nodes.values())if(node.userData.motionX!==undefined)node.position.x=node.userData.motionX;
-  setState(state);if(state==='sit')seated();else mixer?.update(dt);
+  setState(state,immediate);if(state==='sit')seated();else mixer?.update(dt);
   alignParts();
   head.rotation.set(-pitch,yaw,0,'YXZ');
  },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);for(const material of [skin,shirt,pants,shoes])material.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};

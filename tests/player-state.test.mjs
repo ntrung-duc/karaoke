@@ -27,3 +27,14 @@ test('server seat/teleport still wins and an active predicted jump survives its 
  assert.equal(reconcilePlayer(local,{...local,z:2.9,jumpAt:0},{now:10100}).player.jumpAt,10000);
  assert.equal(reconcilePlayer(local,{...local,z:2.9,jumpAt:9000},{now:10100}).player.jumpAt,10000);
 });
+
+test('delayed jump acknowledgements never restart or cancel a local jump',()=>{
+ const local={seat:-1,x:2,z:3,yaw:1,pitch:0,gait:'walkForward',movingUntil:10240,jumpAt:10000};
+ for(const jumpAt of [0,9900,10300]){
+  const acknowledged=reconcilePlayer(local,{...local,x:1,jumpAt},{now:10400});
+  assert.equal(acknowledged.player.jumpAt,10000);
+  assert.equal(acknowledged.player.x,2);
+ }
+ const landed={...local,jumpAt:10000};
+ assert.equal(reconcilePlayer(landed,{...landed,jumpAt:10300},{now:12000}).player.jumpAt,10000);
+});

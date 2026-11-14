@@ -43,7 +43,7 @@ export function buildHall(view,send,me){
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
  a.body.position.y=(singer?1:0)+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
- a.update(dt,sitting?'sit':jump.state||(moving?u.gait:'idle'),look,u.pitch);
+ a.update(dt,sitting?'sit':jump.state||(moving?u.gait:'idle'),look,u.pitch,id===me());
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
  function angle(){document.querySelector('#angle').textContent=cameraControls.mode==='overview'?'Toàn cảnh nhà hát':cameraControls.mode==='avatar'?'Góc nhìn avatar':api.owner===me()?'Trên sân khấu':'Góc nhìn thứ nhất'}
@@ -57,7 +57,7 @@ export function buildHall(view,send,me){
  self.jumpAt=now();dirty=true;send({type:'jump'});}
  const api={owner:null,reconnect(){dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
- for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);else if(self)self.jumpAt=u.jumpAt;},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;angle();if(self)pose(self)},seat(){if(!self)return;if(self.seat>=0){stand();first();return}
+ for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;angle();if(self)pose(self)},seat(){if(!self)return;if(self.seat>=0){stand();first();return}
  const occupied=new Set([...actors.values()].filter(a=>a.user?.seat>=0).map(a=>a.user.seat));const near=seats.map((s,i)=>({i,d:Math.hypot(s.x-self.x,s.z-self.z),free:!occupied.has(i)})).filter(s=>s.free).sort((a,b)=>a.d-b.d)[0];if(near){send({type:'seat',index:near.i});first()}}};
  web.domElement.onpointerdown=e=>{web.domElement.focus({preventScroll:true});drag=[e.clientX,e.clientY];web.domElement.setPointerCapture(e.pointerId)};
  web.domElement.onpointermove=e=>{if(!drag||!self)return;const dx=(e.clientX-drag[0])*.005,dy=(e.clientY-drag[1])*.004;drag=[e.clientX,e.clientY];if(cameraControls.mode==='overview'){eyeYaw-=dx;eyePitch=Math.max(-.55,Math.min(.65,eyePitch-dy))}else if(cameraControls.turn(dx,dy,self))dirty=true;};
@@ -70,7 +70,7 @@ export function buildHall(view,send,me){
   if(previousMode!==cameraControls.mode)angle();
  },{passive:false});
  window.addEventListener('keydown',e=>{if(!document.querySelector('#drawer').hidden||e.target.closest('input,textarea,select,[contenteditable="true"]'))return;
- if(e.code==='Space'){if(e.target.closest('button'))return;e.preventDefault();if(!e.repeat)jump();return;}
+ if(e.code==='Space'){e.preventDefault();if(!e.repeat)jump();return;}
  const key=movementKey(e);if(!key)return;e.preventDefault();if(cameraControls.mode==='overview')first();keys.add(key)});window.addEventListener('keyup',e=>keys.delete(movementKey(e)));window.addEventListener('blur',()=>keys.clear());
  document.querySelector('#jump').onpointerdown=e=>{e.preventDefault();jump()};
  document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{b.setPointerCapture(e.pointerId);first();keys.add(b.dataset.key)};b.onpointerup=b.onpointercancel=()=>keys.delete(b.dataset.key)});

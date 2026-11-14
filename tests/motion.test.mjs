@@ -4,13 +4,13 @@ import {readFile} from 'node:fs/promises';
 import * as T from 'three';
 import {jumpPose,JUMP_HEIGHT,JUMP_DURATION,TAKEOFF,FLIGHT,movementGait,gaits} from '../public/motion.js';
 
-test('jump has grounded takeoff, a single apex, landing and a bounded duration',()=>{
+test('jump rises on the first frame, has a single apex, landing and a bounded duration',()=>{
  const start=10000;
  assert.equal(jumpPose(0,start).state,null);
  assert.equal(jumpPose(start,start-1).state,null);
- assert.equal(jumpPose(start,start+100).state,'jump');
- assert.equal(jumpPose(start,start+100).height,0);
- assert.ok(Math.abs(jumpPose(start,start+(TAKEOFF+FLIGHT/2)*1000).height-JUMP_HEIGHT)<1e-9);
+ assert.equal(jumpPose(start,start+16).state,'jump');
+ assert.ok(jumpPose(start,start+16).height>0);
+ assert.ok(Math.abs(jumpPose(start,start+(TAKEOFF+FLIGHT)/2*1000).height-JUMP_HEIGHT)<1e-9);
  assert.equal(jumpPose(start,start+(TAKEOFF+FLIGHT+.01)*1000).state,'land');
  assert.equal(jumpPose(start,start+(JUMP_DURATION+.01)*1000).state,null);
  for(let ms=0;ms<=2000;ms+=5){const {height}=jumpPose(start,start+ms);assert.ok(height>=0&&height<=JUMP_HEIGHT);}
