@@ -115,7 +115,7 @@ function showPanel(name){
   const selected=control.dataset.panel===name;
   control.setAttribute('aria-expanded',String(selected));
   $('#'+control.dataset.panel).hidden=!selected;
-  if(selected)$('#panel-title').textContent=control.textContent.slice(1);
+  if(selected)$('#panel-title').textContent={music:'Chọn bài',room:'Phòng hát',chat:'Chat'}[name];
  }
  if(name)$('#close').focus();
  else if(previous)document.querySelector('[data-panel="'+previous+'"]').focus();
