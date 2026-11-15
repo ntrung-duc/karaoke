@@ -29,6 +29,21 @@ test('smooth clothed toy keeps skin, shirt, pants and shoes independent across m
  for(let i=0;i<30;i++)avatar.update(0,'idle',i*.2,.1);
  rig.children.forEach((n,i)=>assert.ok(n.position.distanceTo(rest[i])<1e-6,'look input must not spread the body or change joint placement'));
  assert.equal(avatar.body.rotation.y,0);
+ avatar.update(0,'sit',0,0);avatar.body.updateMatrixWorld(true);
+ const boundsOf=name=>new T.Box3().setFromObject(avatar.body.getObjectByName(name));
+ function gap(a,b){const one=boundsOf(a),two=boundsOf(b);return Math.hypot(...['x','y','z'].map(axis=>Math.max(0,one.min[axis]-two.max[axis],two.min[axis]-one.max[axis])));}
+ for(const side of ['L','R']){
+  assert.ok(gap('torso','upperArm'+side)<.025,'shoulder stays connected to shirt');
+  assert.ok(gap('upperArm'+side,'forearm'+side)<.025,'elbow connects to forearm');
+  assert.ok(gap('hips','thigh'+side)<.025,'thigh joins hips');
+  assert.ok(gap('thigh'+side,'shin'+side)<.025,'knee joins thigh and shin');
+  assert.ok(gap('shin'+side,'foot'+side)<.025,'shoe joins ankle');
+  assert.ok(Math.abs(avatar.body.getObjectByName('forearm'+side).position.x)<.45,'arms do not spread beyond the armrests');
+ }
+ for(let i=0;i<10;i++)avatar.update(.016,'sit',i*.2,.1);
+ assert.ok(Math.abs(avatar.body.getObjectByName('forearmL').position.x)<.45);
+ avatar.update(.016,'idle',0,0);
+ assert.equal(avatar.body.getObjectByName('shinL').scale.y,1,'standing restores normal leg dimensions');
  for(const state of ['sit','idle','walkForward','runBackwardRight','jump','fall','land']){
   avatar.update(.016,state,Math.PI,.2);avatar.body.updateMatrixWorld(true);
   const bounds=new T.Box3().setFromObject(avatar.body);

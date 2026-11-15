@@ -4,8 +4,8 @@ import {roundedBox} from './toy-avatar.js';
 // Each component is drawn once for every seat, with shared geometry/materials.
 // The reference's upholstery is represented by rounded cushions and seam piping.
 export function addRecliners(scene,seats){
- const fabric=new T.MeshStandardMaterial({color:'#a4a9b5',roughness:.96,emissive:'#a4a9b5',emissiveIntensity:.1});
- const seams=new T.MeshStandardMaterial({color:'#858c99',roughness:1});
+ const fabric=new T.MeshStandardMaterial({color:'#17181c',roughness:.96,emissive:'#17181c',emissiveIntensity:.06});
+ const seams=new T.MeshStandardMaterial({color:'#292b31',roughness:1});
  const base=new T.MeshStandardMaterial({color:'#262932',roughness:.6,metalness:.25});
  const transform=new T.Object3D(),parts=[];
  function part(name,geometry,material,x,y,z,rx=0,rz=0){

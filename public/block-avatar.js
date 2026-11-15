@@ -74,15 +74,18 @@ export function createAvatar(color,material) {
   current=name;
  }
  function seated(){
-  // The pack has no sit clip; use a seat pose tailored to the hall chairs.
-  const placement={hips:[0,.88,0],torso:[0,1.08,0],head:[0,1.47,0]};
+  // Use connected joints in final avatar space. Walking's shoulder/hip widening
+  // must not be applied again to this hand-authored chair pose.
+  const placement={hips:[0,.88,0],torso:[0,1.08,0],head:[0,1.50,0]};
   for(const side of ['L','R']){
    const x=side==='L'?.17:-.17;
-   placement['thigh'+side]=[x,.77,-.20];placement['shin'+side]=[x,.38,-.40];placement['foot'+side]=[x,.08,-.47];
-   placement['upperArm'+side]=[x*2.25,1.07,-.05];placement['forearm'+side]=[x*2.25,.85,-.17];
+   placement['thigh'+side]=[x,.77,-.20];placement['shin'+side]=[x,.435,-.40];placement['foot'+side]=[x,.08,-.47];
+   placement['upperArm'+side]=[Math.sign(x)*.40,1.18,-.015];placement['forearm'+side]=[Math.sign(x)*.40,1.065,-.12];
   }
   for(const [name,p] of Object.entries(placement)){
-   const node=nodes.get(name);if(!node)continue;node.position.fromArray(p);node.rotation.set(name.startsWith('thigh')?-Math.PI/2:name.startsWith('foot')?-Math.PI/2:0,Math.PI,0);
+   const node=nodes.get(name);if(!node)continue;node.position.fromArray(p);
+   node.rotation.set(['thigh','foot','forearm'].some(prefix=>name.startsWith(prefix))?-Math.PI/2:0,Math.PI,0);
+   if(name.startsWith('shin'))node.scale.y=1.55;
   }
  }
  function setFace(index){
@@ -111,9 +114,9 @@ export function createAvatar(color,material) {
  }
  return {body,head,ready,setFace,setShirt(value){shirt.color.set(shirtColor(value));},setSkin(index){skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch,immediate=false){
   if(disposed||!mixer&&!failed)return;
-  for(const node of nodes.values())if(node.userData.motionX!==undefined)node.position.x=node.userData.motionX;
+  for(const node of nodes.values()){node.scale.set(1,1,1);if(node.userData.motionX!==undefined)node.position.x=node.userData.motionX;}
   setState(state,immediate);if(state==='sit')seated();else mixer?.update(dt);
-  alignParts();
+  if(state!=='sit')alignParts();
   head.rotation.set(-pitch,yaw,0,'YXZ');
  },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);for(const material of [skin,shirt,pants,shoes])material.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};
 }
