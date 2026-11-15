@@ -44,8 +44,7 @@ export function joinMember(room,{id,connectionId,token,resumeToken},now){
  let member=digest?[...room.users.values()].find(u=>u.tokenDigest===digest):null;
  if(!member){
   if(room.users.size>=80)throw new Error('ROOM_FULL');
-  const seat=seats.findIndex((_,index)=>![...room.users.values()].some(u=>u.data.seat===index));
-  const data={id,name:'Khách',seat,...(seats[seat]||{x:0,z:11}),yaw:0,bodyYaw:0,pitch:0,face:0,skin:0,shirt:shirtColor(),color:Math.floor(Math.random()*6),mic:false,...resetMotion};
+  const data={id,name:'Khách',seat:-1,x:0,z:15,yaw:0,bodyYaw:0,pitch:0,face:0,skin:0,shirt:shirtColor(),color:Math.floor(Math.random()*6),mic:false,...resetMotion};
   member={data,tokenDigest:tokenDigest(token)};room.users.set(id,member);
  }else token=resumeToken;
  member.connectionId=connectionId;member.expiresAt=now+PRESENCE_MS;

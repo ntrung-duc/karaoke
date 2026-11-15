@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
+import {randomUUID} from 'node:crypto';
 import {WebSocket} from 'ws';
 
 test('two users receive validated movement, authoritative jumps and seat resets',async t=>{
@@ -26,8 +27,9 @@ test('two users receive validated movement, authoritative jumps and seat resets'
  assert.equal((await fetch(`http://127.0.0.1:${port}/`,{method:'POST'})).status,405);
  const head=await fetch(`http://127.0.0.1:${port}/assets/mannequin.glb`,{method:'HEAD'});
  assert.equal(head.status,200);assert.ok(Number(head.headers.get('content-length'))>0);assert.equal((await head.arrayBuffer()).byteLength,0);
+ const room='motion-'+randomUUID();
  async function connect(){
-  const ws=new WebSocket(`ws://127.0.0.1:${port}/live?room=motion-test`),messages=[];
+  const ws=new WebSocket(`ws://127.0.0.1:${port}/live?room=${room}`),messages=[];
   ws.on('message',raw=>messages.push(JSON.parse(raw)));await once(ws,'open');ws.send(JSON.stringify({type:'join'}));
   t.after(()=>ws.close());return {ws,messages};
  }
@@ -38,6 +40,7 @@ test('two users receive validated movement, authoritative jumps and seat resets'
  }
  const one=await connect(),hello=await wait(one,m=>m.type==='hello'),id=hello.id,two=await connect();
  const send=m=>one.ws.send(JSON.stringify(m));
+ send({type:'seat',index:0});
  send({type:'jump'});send({type:'name',value:'Seated'});
  const seated=await wait(one,m=>m.type==='state'&&m.users.some(u=>u.name==='Seated'));
  assert.equal(seated.users.find(u=>u.id===id).jumpAt,0);

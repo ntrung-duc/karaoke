@@ -22,7 +22,7 @@ test('slow storage coalesces queued movement without overtaking seat commands',a
   throw new Error('Movement update missing');
  }
  await once(ws,'open');const send=message=>ws.send(JSON.stringify(message));send({type:'join'});
- await wait(m=>m.type==='state');send({type:'seat',index:-1});await wait(m=>m.type==='state'&&m.users[0].seat===-1);
+ const joined=await wait(m=>m.type==='state');assert.equal(joined.users[0].seat,-1);
  hold=true;const move=x=>({type:'move',x,z:0,yaw:0,pitch:0,gait:'walkRight'});
  send(move(0));await started;
  for(let i=1;i<=100;i++)send(move(i/100));
@@ -57,7 +57,10 @@ async function exerciseSharedRooms(t,stores){
  const [a,b]=await Promise.all([connect(0),connect(1)]);
  const id=a.hello.id,other=b.hello.id;
  const both=await wait(b,m=>m.type==='state'&&m.users.length===2);
- assert.equal(new Set(both.users.map(u=>u.seat)).size,2,'concurrent joins allocate distinct seats');
+ for(const user of both.users){
+  assert.equal(user.seat,-1,'new arrivals stand at the elevator without reserving chairs');
+  assert.equal(user.x,0);assert.equal(user.z,15);assert.equal(user.yaw,0);
+ }
  assert.ok(!JSON.stringify(both).includes(a.hello.resumeToken),'resume secrets never reach other players');
  a.ws.send(JSON.stringify({type:'appearance',face:6,skin:4,shirt:'#ff4477'}));
  const dressed=await wait(b,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.skin===4);
@@ -80,6 +83,7 @@ async function exerciseSharedRooms(t,stores){
  const restored=await wait(resumed,m=>m.type==='state'&&m.users.length===2&&m.song?.key===songKey);
  assert.equal(restored.users.find(u=>u.id===id).face,6);assert.equal(restored.users.find(u=>u.id===id).skin,4);
  assert.equal(restored.users.find(u=>u.id===id).shirt,'#ff4477');
+ assert.equal(restored.users.find(u=>u.id===id).z,-4,'reconnecting singers keep their stage position');
  assert.equal(restored.chat.at(-1).text,'Xin chào cả phòng <b>test</b>','chat survives reconnect to another instance');
  assert.equal(restored.queue.length,1);
  const isolated=await connect(0,undefined,'another');
