@@ -12,7 +12,7 @@ import {pathToSeat} from './navigation.js';
 import {createRenderBudget} from './render-budget.js';
 export function buildHall(view,send,me){
  const scene=new T.Scene(),overlay=new T.Scene(),camera=new T.PerspectiveCamera(62,1,.08,95);
- const web=new T.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Shift chạy, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
+ const web=new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Shift chạy, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
  const css=new CSS3DRenderer();Object.assign(css.domElement.style,{position:'absolute',inset:'0',pointerEvents:'none'});view.prepend(css.domElement);
  const renderBudget=createRenderBudget(Math.min(devicePixelRatio,1));let pixelRatio=web.getPixelRatio();
  const motionDebug=new URLSearchParams(location.search).has('motionDebug');let measuredInput=0,pendingInput=0,debugFrames=0,debugTime=0;
@@ -20,6 +20,7 @@ export function buildHall(view,send,me){
  function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.79}));return materials.get(c)}
  function box(x,y,z,w,h,d,c,parent=scene){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
  const {rear,poster,hole,spot,shaft,fixture,chairs}=createScenery(scene,box,mat);
+ const privateHole=new T.Mesh(new T.PlaneGeometry(800,450),hole.clone());privateHole.name='PrivateSingerScreen';privateHole.material.depthTest=false;privateHole.material.depthWrite=false;privateHole.renderOrder=1000;privateHole.visible=false;scene.add(privateHole);
  batchStaticBoxes(scene,cube);
  const axis=new T.Vector3(0,1,0),ray=new T.Vector3(),aim=new T.Vector3();
  function focusStage(dt){
@@ -143,6 +144,7 @@ export function buildHall(view,send,me){
   privateOffset.set(-width/2+w/2+width*.03,-height/2+h/2+height*.09,-distance).applyQuaternion(camera.quaternion);
   display.position.copy(camera.position).add(privateOffset);display.quaternion.copy(camera.quaternion);display.scale.set(w/800,h/450,1);
  }else{display.position.set(rear.x,rear.y,rear.z+.015);display.rotation.set(0,rear.rot,0);display.scale.set(rear.w/800,rear.h/450,1);}
+ privateHole.visible=active&&privateScreen;privateHole.position.copy(display.position);privateHole.quaternion.copy(display.quaternion);privateHole.scale.copy(display.scale);
  web.render(scene,camera);if(active)css.render(overlay,camera);
  if(motionDebug){
   const data=web.domElement.dataset;data.playerX=String(self?.x);data.playerZ=String(self?.z);data.pixelRatio=String(pixelRatio);data.bodyYaw=String(actors.get(me())?.body.rotation.y);
