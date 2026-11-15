@@ -1,46 +1,50 @@
 import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
-// Smooth toy body with a separate garment material for each moving joint.
-export function createToyPart(name,size,skin){
+// Rounded cloth-doll silhouette, retargeted onto the existing motion joints.
+export function createToyPart(name,size,material,helmet){
  const group=new T.Group(),pieces=[];
- function add(g,x=0,y=0,z=0,rz=0){g.rotateZ(rz);g.translate(x,y,z);pieces.push(g.index?g.toNonIndexed():g.clone());g.dispose();}
- function box(w,h,d,r,x=0,y=0,z=0){add(roundedBox(w,h,d,r),x,y,z);}
+ function add(g,x=0,y=0,z=0){g.translate(x,y,z);pieces.push(g.index?g.toNonIndexed():g.clone());g.dispose();}
+ function oval(x,y,z,px=0,py=0,pz=0){const g=new T.SphereGeometry(1,20,12);g.scale(x,y,z);add(g,px,py,pz);}
+ function capsule(radius,length,depth=1){const g=new T.CapsuleGeometry(radius,Math.max(.001,length-radius*2),6,14);g.scale(1,1,depth);add(g);}
  const h=size[1];
  if(name==='head'){
-  box(.43,.36,.36,.075);
-  add(new T.CylinderGeometry(.082,.082,.066,20),0,.21,0);
-  add(new T.CylinderGeometry(.085,.085,.095,20),0,-.205,0);
+  oval(.225,.26,.21);
+  oval(.075,.10,.075,0,-.255,0);
  }else if(name==='torso'){
-  const shell=roundedBox(.61,h+.055,.34,.045),p=shell.attributes.position;
-  for(let i=0;i<p.count;i++)p.setX(i,p.getX(i)*(1+.13*p.getY(i)/(h/2)));
-  shell.computeVertexNormals();add(shell);
+  // A continuous gently rounded torso, with a narrower neck and soft belly.
+  const profile=[[-.27,0],[-.26,.18],[-.235,.28],[-.15,.295],[0,.275],[.14,.285],[.22,.25],[.265,.10],[.27,0]];
+  const g=new T.LatheGeometry(profile.map(([y,r])=>new T.Vector2(r,y)),24);g.scale(1,1,.57);add(g);
  }else if(name==='hips'){
-  box(.61,.125,.35,.012);box(.09,.16,.29,.012,0,-.075,0);
+  oval(.29,.14,.165,0,-.005,0);
  }else if(name.startsWith('upperArm')){
-  box(.23,h+.025,.27,.04);
+  capsule(.115,h+.065,1.02);
  }else if(name.startsWith('forearm')){
-  box(.19,h+.035,.23,.043);
-  add(new T.CylinderGeometry(.063,.063,.07,12),0,h/2+.025,0);
-  const ring=new T.Shape(),outer=.108,inner=.058,start=-Math.PI*.23,end=Math.PI*1.23;
-  ring.absarc(0,0,outer,start,end,false);ring.lineTo(Math.cos(end)*inner,Math.sin(end)*inner);
-  ring.absarc(0,0,inner,end,start,true);ring.closePath();
-  const grip=new T.ExtrudeGeometry(ring,{depth:.085,bevelEnabled:true,bevelSize:.009,bevelThickness:.008,bevelSegments:2,steps:1,curveSegments:18});
-  grip.translate(0,0,-.0425);grip.rotateZ(Math.PI);add(grip,0,h/2+.137,0);
+  capsule(.092,h+.08,1.08);
+  // Closed mitten hands replace the old C-shaped grips.
+  oval(.098,.115,.095,0,h/2+.075,0);
  }else if(name.startsWith('thigh')){
-  box(.268,h+.016,.31,.033);
+  capsule(.134,h+.04,1.08);
  }else if(name.startsWith('shin')){
-  box(.265,h+.01,.3,.018);
+  const profile=[[-h/2-.025,0],[-h/2-.015,.055],[-h*.3,.086],[0,.106],[h*.3,.125],[h/2,.11],[h/2+.025,0]];
+  const g=new T.LatheGeometry(profile.map(([y,r])=>new T.Vector2(r,y)),16);g.scale(1,1,1.1);add(g);
  }else if(name.startsWith('foot')){
-  // Foot motion's local +Y points towards the toe.
-  box(.276,h+.145,.145,.015,0,.022,0);
+  // Small rounded feet; local +Y still follows the animated toe direction.
+  oval(.115,.13,.08,0,.015,0);
  }
  const geometry=mergeGeometries(pieces);pieces.forEach(g=>g.dispose());geometry.computeBoundingSphere();
- const mesh=new T.Mesh(geometry,skin);mesh.name=name==='head'?'ToyHeadShell':(name==='torso'||name.startsWith('upperArm')?'ToyShirt-':name==='hips'||name.startsWith('thigh')||name.startsWith('shin')?'ToyPants-':name.startsWith('foot')?'ToyShoes-':'ToySkin-')+name;
+ const mesh=new T.Mesh(geometry,material);mesh.name=name==='head'?'ToyHeadShell':(name==='torso'||name.startsWith('upperArm')?'ToyShirt-':name==='hips'||name.startsWith('thigh')||name.startsWith('shin')?'ToyPants-':name.startsWith('foot')?'ToyShoes-':'ToySkin-')+name;
  mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);
  if(name==='head'){
-  const face=new T.Mesh(new T.PlaneGeometry(.285,.275),new T.MeshBasicMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,alphaTest:.025}));
-  face.position.set(0,-.006,.181);face.name='ToyFace';face.visible=false;group.add(face);
+  const dome=new T.SphereGeometry(1,24,12,0,Math.PI*2,0,Math.PI/2);dome.scale(.243,.24,.231);dome.translate(0,.15,0);
+  const brim=new T.TorusGeometry(.229,.022,6,28);brim.rotateX(Math.PI/2);brim.scale(1.04,1,.99);brim.translate(0,.15,0);
+  const hat=new T.Mesh(mergeGeometries([dome,brim]),helmet);dome.dispose();brim.dispose();hat.name='AvatarBlackHelmet';group.add(hat);
+  // Curve the face decal over the oval head so its edges cannot float off it.
+  const faceGeometry=new T.PlaneGeometry(.29,.28,12,10),p=faceGeometry.attributes.position;
+  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i)-.02;p.setXYZ(i,x,y,.21*Math.sqrt(Math.max(0,1-(x/.225)**2-(y/.26)**2))+.003);}
+  faceGeometry.computeVertexNormals();
+  const face=new T.Mesh(faceGeometry,new T.MeshBasicMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,alphaTest:.025}));
+  face.name='ToyFace';face.visible=false;group.add(face);
  }
  return group;
 }

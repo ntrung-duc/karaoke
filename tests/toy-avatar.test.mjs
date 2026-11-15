@@ -12,12 +12,15 @@ test('smooth clothed toy keeps skin, shirt, pants and shoes independent across m
  t.after(()=>{avatar.dispose();other.dispose();});
  const shell=avatar.body.getObjectByName('ToyHeadShell'),torso=avatar.body.getObjectByName('ToyShirt-torso');
  assert.ok(shell);assert.ok(avatar.body.getObjectByName('ToyFace'));
+ const helmet=avatar.body.getObjectByName('AvatarBlackHelmet');assert.ok(helmet);
+ assert.equal(helmet.parent,shell.parent,'helmet follows independent head rotation');
  torso.geometry.computeBoundingBox();assert.ok(torso.geometry.boundingBox.max.z<.18,'shirt has no muscle relief');
  assert.equal(avatar.body.getObjectByName('ToyMuscles-torso'),undefined);
  avatar.setShirt('#ff4477');
  const pants=avatar.body.getObjectByName('ToyPants-thighL'),shoes=avatar.body.getObjectByName('ToyShoes-footL');
  const pantsColor=pants.material.color.getHexString(),shoesColor=shoes.material.color.getHexString();
  avatar.setSkin(5);
+ assert.equal(helmet.material.color.getHexString(),'181c1e','skin and shirt choices leave the helmet black');
  avatar.body.traverse(o=>{if(o.name.startsWith('ToySkin-')||o.name==='ToyHeadShell')assert.equal(o.material.color.getHexString(),SKINS[5].color.slice(1));if(o.name.startsWith('ToyShirt-'))assert.equal(o.material.color.getHexString(),'ff4477');});
  assert.equal(pants.material.color.getHexString(),pantsColor);assert.equal(shoes.material.color.getHexString(),shoesColor);
  assert.notEqual(pantsColor,shoesColor);

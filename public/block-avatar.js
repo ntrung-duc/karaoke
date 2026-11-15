@@ -21,6 +21,7 @@ export function createAvatar(color,material) {
  const shirt=new T.MeshStandardMaterial({color:shirtColor(),roughness:.85});
  const pants=new T.MeshStandardMaterial({color:'#263449',roughness:.9});
  const shoes=new T.MeshStandardMaterial({color:'#eeeeef',roughness:.7});
+ const helmet=new T.MeshStandardMaterial({color:'#181c1e',roughness:.5,metalness:.08});
  // A camera-space soft fill keeps personal colors readable in the dark hall
  // without introducing a light per user or lighting the room itself.
  skin.onBeforeCompile=shader=>{
@@ -39,7 +40,7 @@ export function createAvatar(color,material) {
  function mesh(name,size) {
   const node=new T.Group();node.name=name;rig.add(node);nodes.set(name,node);
   const fabric=name==='torso'||name.startsWith('upperArm')?shirt:name==='hips'||name.startsWith('thigh')||name.startsWith('shin')?pants:name.startsWith('foot')?shoes:skin;
-  const part=createToyPart(name,size,fabric);node.add(part);
+  const part=createToyPart(name,size,fabric,helmet);node.add(part);
   if(name==='head'){
    // Baked head faces +Z locally, then turns with the source head motion.
    node.add(head);
@@ -129,5 +130,5 @@ export function createAvatar(color,material) {
   setState(state,immediate);if(state==='sit')seated();else if(state==='parker'){const action=actions.parker;action.enabled=true;action.play();action.time=Math.max(0,emoteElapsed)%action.getClip().duration;mixer.update(0);}else mixer?.update(dt);
   if(state!=='sit'&&state!=='parker')alignParts();
   head.rotation.set(-pitch,yaw,0,'YXZ');
- },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);for(const material of [skin,shirt,pants,shoes])material.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};
+ },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);for(const material of [skin,shirt,pants,shoes,helmet])material.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};
 }
