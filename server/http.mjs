@@ -2,12 +2,13 @@ import {readFile} from 'node:fs/promises';
 
 // Explicit public surface: never serve project source, secrets or source downloads.
 const files = new Map([
-  ...['index.html', 'app.js', 'connection.js', 'audio-output.js', 'playback.js', 'chat.js', 'hall.js', 'camera-controls.js', 'player-state.js', 'input.js', 'render-budget.js', 'scenery.js', 'recliner.js', 'navigation.js', 'avatar.js', 'avatar-head.js', 'block-avatar.js', 'toy-avatar.js', 'faces.js', 'avatar-settings.js', 'motion.js', 'session.js', 'layout.js', 'style.css']
+  ...['index.html', 'app.js', 'connection.js', 'audio-output.js', 'playback.js', 'chat.js', 'youtube-search.js', 'hall.js', 'camera-controls.js', 'player-state.js', 'input.js', 'render-budget.js', 'scenery.js', 'recliner.js', 'navigation.js', 'avatar.js', 'avatar-head.js', 'block-avatar.js', 'toy-avatar.js', 'faces.js', 'avatar-settings.js', 'motion.js', 'session.js', 'layout.js', 'style.css']
     .map(file => ['/' + file, 'public/' + file]),
   ['/', 'public/index.html'],
   ['/assets/mannequin.glb', 'public/assets/mannequin.glb'],
   ['/assets/face-atlas.png', 'public/assets/face-atlas.png'],
   ['/assets/rear-wall-mural.png', 'public/assets/rear-wall-mural.png'],
+  ['/assets/parker-dance.json', 'public/assets/parker-dance.json'],
   ['/assets/human-motions.json', 'public/assets/human-motions.json'],
   ...['three.module.js', 'three.core.js'].map(file => ['/lib/' + file, 'node_modules/three/build/' + file]),
   ['/lib/css.js', 'node_modules/three/examples/jsm/renderers/CSS3DRenderer.js'],

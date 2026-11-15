@@ -83,7 +83,8 @@ export function buildHall(view,send,me){
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
  a.body.position.y=(singer?1:0)+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
- a.update(dt,sitting?'sit':jump.state||(moving?u.gait:'idle'),look,u.pitch,id===me());
+ const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
+ a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?'parker':'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
  function angle(){web.domElement.dataset.cameraMode=cameraControls.mode;}
@@ -91,11 +92,13 @@ export function buildHall(view,send,me){
  function move(dx,dz){if(!self||self.seat>=0)return;const stage=api.owner===me();
  for(const [x,z] of [[self.x+dx,self.z],[null,self.z+dz]]){const p=position(x??self.x,z,stage);if(stage||clearSeat(p.x,p.z))Object.assign(self,p)}dirty=true}
  function stand(){if(standLocally(self)){pendingStand=true;send({type:'seat',index:-1});dirty=true;}}
+ let emoteGeneration=0;
+ function stopEmote(){emoteGeneration++;if(self?.emoteAt){self.emoteAt=0;send({type:'emote',on:false});}}
  function jump(){if(!self||jumpPose(self.jumpAt,now()).state)return;
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
- self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ stopEmote();self.emoteAt=0;self.jumpAt=now();dirty=true;send({type:'jump'});}
+ const api={owner:null,async prepareEmote(){const generation=emoteGeneration;await actors.get(me())?.prepareDance();return generation===emoteGeneration;},emote(on){if(self)self.emoteAt=on?now():0;focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();
@@ -121,14 +124,14 @@ export function buildHall(view,send,me){
  },{passive:false});
  window.addEventListener('keydown',e=>{if(blocked()||editing(e.target))return;
  if(e.code==='Space'){if(e.target.closest('button'))return;e.preventDefault();cancelWalk();if(!e.repeat)jump();return;}
- const key=input.press(e);if(!key)return;e.preventDefault();cancelWalk();if(cameraControls.mode==='overview')first();},true);
+ const key=input.press(e);if(!key)return;e.preventDefault();if(key!=='shift')stopEmote();cancelWalk();if(cameraControls.mode==='overview')first();},true);
  window.addEventListener('keyup',e=>input.release(e),true);
  function releaseControls(){input.clear();cancelWalk();drag=null;hoverPoint=null;hideSeatHover();}
  window.addEventListener('blur',releaseControls);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseControls();});
  document.addEventListener('focusin',e=>{if(e.target.closest('input,textarea,select,button,[contenteditable="true"]'))input.clear();});
  document.querySelector('#jump').onpointerdown=e=>{e.preventDefault();cancelWalk();focusHall();jump()};
- document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);cancelWalk();first();input.press({key:b.dataset.key})};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>input.release({key:b.dataset.key})});
+ document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);cancelWalk();stopEmote();first();input.press({key:b.dataset.key})};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>input.release({key:b.dataset.key})});
  new ResizeObserver(()=>{const w=view.clientWidth,h=view.clientHeight;web.setSize(w,h);css.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}).observe(view);
  function draw(t){requestAnimationFrame(draw);const frameMs=t-previous,dt=Math.min(.1,frameMs/1000);previous=t;
  if(!document.hidden){const ratio=renderBudget.sample(frameMs);if(ratio!==pixelRatio){pixelRatio=ratio;web.setPixelRatio(ratio);}}
@@ -148,7 +151,7 @@ export function buildHall(view,send,me){
   }
  }
  const moved=Math.hypot(self.x-oldX,self.z-oldZ)>.00001;
- if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved)hoverDirty=true;
+ if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;self.emoteAt=0;}
  const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,keys.has('shift')):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
  camera.position.set(self.x,api.owner===me()?2.55:self.seat>=0?1.88:1.55,self.z);
  if(cameraControls.mode==='avatar'){

@@ -1,4 +1,5 @@
 node_modules/
+.tmp/
 .deploy-repo/
 dist/
 .vercel/

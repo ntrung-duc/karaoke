@@ -4,7 +4,10 @@ import {faceIndex,skinColor,shirtColor} from './avatar-settings.js';
 import {faceTexture} from './faces.js';
 import {createToyPart} from './toy-avatar.js';
 
-let library;
+let library,danceLibrary;
+export function loadDance(){
+ return danceLibrary??=fetch('/assets/parker-dance.json').then(r=>{if(!r.ok)throw new Error('Không tải được điệu nhảy');return r.json();}).then(data=>T.AnimationClip.parse(data.clip)).catch(error=>{danceLibrary=null;throw error;});
+}
 export function loadMotions() {
  return library ??= fetch('/assets/human-motions.json').then(r=>{
   if(!r.ok)throw new Error('Không tải được chuyển động avatar');
@@ -31,6 +34,7 @@ export function createAvatar(color,material) {
   garment.customProgramCacheKey=()=> 'toy-clothing-fill-v1';
  }
  const yAxis=new T.Vector3(),zAxis=new T.Vector3(),xAxis=new T.Vector3(),front=new T.Vector3(0,0,-1),basis=new T.Matrix4();
+ let danceReady;
  let mixer,actions={},current=null,failed=false,disposed=false,selectedFace=-1,selectedSkin=0,selectedShirt=shirtColor(),lastYaw,lastPitch,decal;
  function mesh(name,size) {
   const node=new T.Group();node.name=name;rig.add(node);nodes.set(name,node);
@@ -65,9 +69,14 @@ export function createAvatar(color,material) {
   nodes.get('torso').position.set(0,1,0);nodes.get('head').position.set(0,1.55,0);nodes.get('head').rotation.y=Math.PI;
   nodes.get('thighL').position.set(-.17,.36,0);nodes.get('thighR').position.set(.17,.36,0);
  });
+ function prepareDance(){return danceReady??=ready.then(()=>loadDance()).then(clip=>{if(!disposed&&mixer)actions.parker=mixer.clipAction(clip);}).catch(error=>{danceReady=null;throw error;});}
  function setState(name,immediate=false){
   if(!mixer||name===current)return;
-  if(name==='sit'){for(const action of Object.values(actions))action.stop();current=name;return;}
+  if(name==='sit'||name==='parker'){
+   for(const action of Object.values(actions))action.stop();
+   if(name==='parker')actions.parker.reset().setEffectiveWeight(1).play();
+   current=name;return;
+  }
   const next=actions[name]||actions.idle,old=actions[current];
   next.reset().setEffectiveWeight(1).play();
   if(old){if(immediate)old.stop();else next.crossFadeFrom(old,.12,false);}
@@ -111,13 +120,14 @@ export function createAvatar(color,material) {
    basis.makeBasis(xAxis,yAxis,zAxis);node.quaternion.setFromRotationMatrix(basis);
   }
  }
- return {body,head,ready,setFace,setShirt(value){const color=shirtColor(value);if(selectedShirt===color)return;selectedShirt=color;shirt.color.set(color);},setSkin(index){if(selectedSkin===index)return;selectedSkin=index;skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch,immediate=false){
+ return {body,head,ready,prepareDance,setFace,setShirt(value){const color=shirtColor(value);if(selectedShirt===color)return;selectedShirt=color;shirt.color.set(color);},setSkin(index){if(selectedSkin===index)return;selectedSkin=index;skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch,immediate=false,emoteElapsed=0){
   if(disposed||!mixer&&!failed)return;
   if(state==='sit'&&current==='sit'&&lastYaw===yaw&&lastPitch===pitch)return;
   lastYaw=yaw;lastPitch=pitch;
+  if(state==='parker'&&!actions.parker){prepareDance().catch(()=>{});state='idle';}
   for(const node of nodes.values()){node.scale.set(1,1,1);if(node.userData.motionX!==undefined)node.position.x=node.userData.motionX;}
-  setState(state,immediate);if(state==='sit')seated();else mixer?.update(dt);
-  if(state!=='sit')alignParts();
+  setState(state,immediate);if(state==='sit')seated();else if(state==='parker'){const action=actions.parker;action.enabled=true;action.play();action.time=Math.max(0,emoteElapsed)%action.getClip().duration;mixer.update(0);}else mixer?.update(dt);
+  if(state!=='sit'&&state!=='parker')alignParts();
   head.rotation.set(-pitch,yaw,0,'YXZ');
  },dispose(){disposed=true;mixer?.stopAllAction();mixer?.uncacheRoot(rig);for(const material of [skin,shirt,pants,shoes])material.dispose();decal?.material.dispose();body.traverse(o=>{if(o.isMesh)o.geometry.dispose()});}};
 }

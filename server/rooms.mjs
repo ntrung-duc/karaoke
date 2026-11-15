@@ -2,11 +2,13 @@ import {WebSocket} from 'ws';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
 import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,RESUME_GRACE_MS} from './room-state.mjs';
+import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
 
 // Only socket ownership is local. Room membership, queues, poses and resume
 // tokens live in the store, and committed events reach every subscribed instance.
-export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
+export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiKey,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
  store??=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):createMemoryStore();
+ const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
  const clients=new Set(),channels=new Map();let stopping=false;
  function scheduleEnd(record,song){
   const channel=record.channel;if(!channel)return;
@@ -79,6 +81,17 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
   client.on('message',raw=>{
    let message;try{message=JSON.parse(raw);}catch{return;}
    if(!message||typeof message!=='object'||record.closed)return;
+   // Search runs independently so an upstream request never queues WASD/jump.
+   if(message.type==='search'){
+    if(!record.ready||!record.id||typeof message.requestId!=='string'||! /^[\w-]{1,64}$/.test(message.requestId)||record.searching)return;
+    record.searching=true;
+    searchYouTube(record.id,message.query,message.karaoke!==false).then(result=>{
+     if(!record.closed)send(record,{type:'search-results',requestId:message.requestId,...result});
+    }).catch(error=>{
+     if(!record.closed)send(record,{type:'search-results',requestId:message.requestId,error:error instanceof YouTubeSearchError?error.message:'Chưa tìm được bài. Thử lại sau hoặc dán liên kết video.'});
+    }).finally(()=>record.searching=false);
+    return;
+   }
    // Keep only the newest unsent pose while Redis is busy. Other commands
    // form barriers so a pose cannot overtake standing, jumping or sitting.
    if(message.type==='move'&&record.moveSlot){record.moveSlot.message=message;return;}

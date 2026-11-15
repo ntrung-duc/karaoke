@@ -6,7 +6,7 @@ import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-setting
 
 export const PRESENCE_MS=60000;
 export const RESUME_GRACE_MS=45000;
-const resetMotion={gait:'idle',movingUntil:0,jumpAt:0};
+const resetMotion={gait:'idle',movingUntil:0,jumpAt:0,emoteAt:0};
 export const tokenDigest=token=>createHash('sha256').update(token).digest('hex');
 export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
@@ -81,6 +81,7 @@ export function applyMessage(room,id,connectionId,message,now){
    const target=position(x,z,singer),allowed=data.seat<0&&(singer||clearSeat(target.x,target.z));
    const moved=allowed&&Math.hypot(target.x-data.x,target.z-data.z)>.0001;
    if(allowed)Object.assign(data,target);
+   if(moved)data.emoteAt=0;
    if(allowed&&bodyYaw!==undefined)data.bodyYaw=wrapYaw(bodyYaw);
    data.gait=moved&&gaits.has(gait)?gait:'idle';data.movingUntil=moved?now+240:0;
    data.yaw=wrapYaw(yaw);data.pitch=Math.min(1,Math.max(-1,pitch));
@@ -88,7 +89,12 @@ export function applyMessage(room,id,connectionId,message,now){
   }
   case 'jump':
    if(data.seat>=0||jumpPose(data.jumpAt,now).state)return {events};
-   data.jumpAt=now;events.push({message:{type:'pose',user:{...data},revision:room.revision}});return {events};
+   data.jumpAt=now;data.emoteAt=0;events.push({message:{type:'pose',user:{...data},revision:room.revision}});return {events};
+  case 'emote':
+   if(!singer||typeof message.on!=='boolean'||message.on&&(message.key!==room.song.key||jumpPose(data.jumpAt,now).state))return {events};
+   data.emoteAt=message.on?(data.emoteAt||now):0;
+   data.gait='idle';data.movingUntil=0;
+   break;
   case 'signal':
    if(room.users.has(message.to)&&(singer||message.to===room.song?.owner))events.push({to:message.to,message:{type:'signal',from:id,signal:message.signal,revision:room.revision}});
    return {events};
