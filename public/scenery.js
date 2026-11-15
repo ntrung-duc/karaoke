@@ -51,7 +51,7 @@ export function createScenery(scene,box,mat){
  for(const x of [-9.65,9.65])box(x,6.8,4,.23,1.4,26,'#ab9077');box(0,3.6,16.8,19.6,7.6,.22,'#443e58'); function art(){
  const c=document.createElement('canvas');c.width=1200;c.height=500;const a=c.getContext('2d'),g=a.createLinearGradient(0,0,1200,500);g.addColorStop(0,'#32192b');g.addColorStop(.55,'#682d43');g.addColorStop(1,'#361e31');a.fillStyle=g;a.fillRect(0,0,1200,500);a.strokeStyle='#bc925d';a.lineWidth=3;a.strokeRect(20,20,1160,460);a.strokeRect(30,30,1140,440);
  for(let i=0;i<15;i++){a.beginPath();a.arc(600,720,345+i*14,Math.PI,Math.PI*2);a.strokeStyle='rgba(233,185,128,.15)';a.stroke()}
- a.textAlign='center';a.fillStyle='#f3d99f';a.font='26px Georgia';a.fillText('✦     N H À   H Á T     ✦',600,166);a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
+ a.textAlign='center';a.fillStyle='#f3d99f';a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
  const poster=new T.MeshBasicMaterial({map:art()}),hole=new T.MeshBasicMaterial({color:0,opacity:0,blending:T.NoBlending,side:T.FrontSide});
  function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
  const rear=screen(0,3.88,-7.45,8.75,3.7,0),front=screen(1.72,1.85,-2.85,1.78,.67,Math.PI+.3);
