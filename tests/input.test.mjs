@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {movementKey,createMovementInput} from '../public/input.js';
+import {movementKey,createMovementInput,createSeatGesture} from '../public/input.js';
 import {createRenderBudget} from '../public/render-budget.js';
 
 test('press and release between render frames still produces movement exactly once',()=>{
@@ -43,6 +43,22 @@ test('a brief press stops on release and delayed repeats cannot restart movement
  assert.equal(input.keys.size,0);
  input.press({code:'KeyA',key:'a',repeat:false});assert.ok(input.keys.has('a'));
  input.clear();assert.equal(input.keys.size,0);
+});
+
+test('held keys recover after a focus reset without permitting repeats after an actual release',()=>{
+ let time=0;const input=createMovementInput(()=>time);
+ input.press({code:'KeyA'});time=10;input.clear();
+ time=20;assert.equal(input.press({code:'KeyA',repeat:true}),'a');time=30;assert.ok(input.sample().right<0);
+ input.release({code:'KeyA'});assert.equal(input.press({code:'KeyA',repeat:true}),null);
+ const initial=createMovementInput(()=>time);assert.equal(initial.press({code:'KeyW',repeat:true}),'w','focus may arrive after the first physical keydown');
+});
+
+test('jumping or moving while the mouse is down cannot select a chair on release',()=>{
+ const gesture=createSeatGesture();gesture.begin(0,100,100);gesture.cancel();assert.equal(gesture.release(0,100,100),false);
+ gesture.begin(0,100,100);gesture.move(130,100);gesture.move(100,100);assert.equal(gesture.release(0,100,100),false);
+ gesture.begin(2,100,100);assert.equal(gesture.release(2,100,100),false);
+ gesture.begin(0,100,100,false);assert.equal(gesture.release(0,100,100),false);
+ gesture.begin(0,100,100);assert.equal(gesture.release(0,101,101),true);
 });
 
 test('an unidentified IME release clears latched movement while unrelated keyup does not',()=>{

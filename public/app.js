@@ -16,7 +16,7 @@ shirtPicker.oninput=()=>{chosenShirt=shirtColor(shirtPicker.value);hall?.appeara
 shirtPicker.onchange=()=>{chosenShirt=shirtColor(shirtPicker.value);localStorage.setItem('rap-shirt',chosenShirt);hall?.appearance(undefined,undefined,chosenShirt);send({type:'appearance',shirt:chosenShirt});};
 const skinPicker=$('#skin-picker');
 SKINS.forEach((skin,index)=>{const option=document.createElement('option');option.value=index;option.textContent=skin.name;skinPicker.append(option);});
-skinPicker.value=chosenSkin;
+if(localStorage.getItem('rap-skin')===null){const option=document.createElement('option');option.value='';option.textContent='Chọn màu da';option.disabled=true;option.selected=true;skinPicker.prepend(option);}else skinPicker.value=chosenSkin;
 skinPicker.onchange=()=>{chosenSkin=skinIndex(Number(skinPicker.value));localStorage.setItem('rap-skin',String(chosenSkin));hall?.appearance(undefined,chosenSkin);send({type:'appearance',skin:chosenSkin});};
 const facePicker=createFacePicker($('#face-picker'),face=>{
  chosenFace=face;localStorage.setItem('rap-face',String(face));hall?.appearance(face);send({type:'appearance',face});
@@ -54,8 +54,8 @@ function sync(){
  if(resumed){player.seekTo(elapsed(),true);player.playVideo();return;}
  if(player.getPlayerState()===1&&Math.abs(player.getCurrentTime()-elapsed())>2)player.seekTo(elapsed(),true);
 }
-window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:1,origin:location.origin},events:{
- onReady:()=>{ready=true;output.apply();sync();},
+window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:0,disablekb:1,origin:location.origin},events:{
+ onReady:()=>{ready=true;player.getIframe().tabIndex=-1;output.apply();sync();},
  onStateChange:()=>{if(Number.isFinite(song?.pausedAt)&&player.getPlayerState()===1)player.pauseVideo();checkPlayback();},
  onAutoplayBlocked:()=>{output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
  onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')
@@ -93,7 +93,7 @@ function connect(){
   },onError:notice,
  });connection.connect();
 }
-$('#name').value=localStorage.getItem('rap-name')||'Khách';$('#name').onchange=()=>{localStorage.setItem('rap-name',$('#name').value);send({type:'name',value:$('#name').value})};
+$('#name').value=localStorage.getItem('rap-name')||'';$('#name').onchange=()=>{localStorage.setItem('rap-name',$('#name').value);send({type:'name',value:$('#name').value})};
 $('#form').onsubmit=e=>{e.preventDefault();if(!connected)return notice('Đang chờ kết nối phòng.');let v;try{const u=new URL($('#url').value.trim());if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(u.hostname))v=u.searchParams.get('v')||u.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/)?.[1];else if(u.hostname==='youtu.be')v=u.pathname.slice(1)}catch{}if(!/^[\w-]{11}$/.test(v||''))return notice('Hãy dán liên kết đến một video YouTube.');send({type:'queue',video:v,title:$('#title').value.trim()||'Karaoke · '+v});e.target.reset();notice('Đã đăng ký bài hát.')};
 $('#pause').onclick=()=>{if(song?.owner===id)send({type:'playback',key:song.key,paused:!Number.isFinite(song.pausedAt)});};
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
@@ -101,7 +101,6 @@ $('#mic').onclick=async()=>{if(stream){stopMic();send({type:'mic',on:false});ret
  try{if(!navigator.mediaDevices)return notice('Mic cần HTTPS hoặc localhost.');const audio=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});if(song?.key!==current||!connected){audio.getTracks().forEach(t=>t.stop());return}stream=audio;send({type:'mic',on:true})}catch{notice('Chưa mở được mic. Kiểm tra quyền mic của trình duyệt.')}};
 
 $('#invite').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',room);if(['localhost','127.0.0.1'].includes(u.hostname)){notice('Để mời bạn bè, mở phòng qua địa chỉ HTTPS dùng chung rồi sao chép liên kết.');return}try{await navigator.clipboard.writeText(u.href);notice('Đã sao chép liên kết phòng.')}catch{notice(u.href)}};
-connect();
 
 const drawer=$('#drawer');
 const switches=document.querySelectorAll('[data-panel]');
@@ -118,7 +117,7 @@ function showPanel(name){
   if(selected)$('#panel-title').textContent={music:'Chọn bài',room:'Phòng hát',chat:'Chat'}[name];
  }
  if(name)$('#close').focus();
- else if(previous)document.querySelector('[data-panel="'+previous+'"]').focus();
+ else if(previous)hall?.focus();
 }
 switches.forEach(button=>button.onclick=()=>showPanel(selectedPanel===button.dataset.panel?null:button.dataset.panel));
 $('#close').onclick=()=>showPanel(null);
@@ -134,3 +133,16 @@ if(document.fullscreenEnabled){
  };
  document.addEventListener('fullscreenchange',()=>{fullscreen.textContent=document.fullscreenElement?'Thoát toàn màn hình':'Toàn màn hình'});
 }
+
+const welcome=document.querySelector('#welcome-dialog'),profileForm=document.querySelector('#profile-form');
+welcome.addEventListener('cancel',event=>event.preventDefault());
+profileForm.onsubmit=event=>{
+ event.preventDefault();const name=$('#name').value.trim();
+ $('#name').setCustomValidity(name?'':'Hãy nhập tên của bạn.');
+ if(!profileForm.reportValidity())return;
+ $('#name').value=name;chosenSkin=skinIndex(Number(skinPicker.value));chosenShirt=shirtColor(shirtPicker.value);
+ localStorage.setItem('rap-name',name);localStorage.setItem('rap-skin',String(chosenSkin));localStorage.setItem('rap-shirt',chosenShirt);
+ welcome.close();connect();hall?.focus();
+};
+$('#name').addEventListener('input',()=>$('#name').setCustomValidity(''));
+welcome.showModal();
