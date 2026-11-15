@@ -23,7 +23,7 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
 facePicker.select(chosenFace);
 const peers=new Map(),notice=t=>$('#notice').textContent=t;
 const sound=$('#sound');
-const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready?player:null,getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
+const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 const playback=createPlaybackMonitor(send);output.apply();
 sound.onclick=()=>{output.toggle();notice('');};
 function send(m){return connection?.send(m)}
