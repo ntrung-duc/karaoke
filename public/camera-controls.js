@@ -8,7 +8,7 @@ const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 // Camera orientation is local-only. Avatar yaw/pitch change in first person.
 export function createCameraControls(){
   return {
-    mode:'avatar',yaw:0,pitch:-.32,distance:DEFAULT_DISTANCE,initialized:false,
+    mode:'first',yaw:0,pitch:0,distance:0,initialized:false,
     movementHeading(head){return this.mode==='first'?head.yaw:this.yaw;},
     faceMovement(head,dx,dz){
       if(this.mode!=='avatar'||!head||Math.hypot(dx,dz)<.00001)return false;
