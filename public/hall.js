@@ -60,7 +60,7 @@ export function buildHall(view,send,me){
  a.update(dt,sitting?'sit':jump.state||(moving?u.gait:'idle'),look,u.pitch,id===me());
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
- function angle(){document.querySelector('#angle').textContent=cameraControls.mode==='overview'?'Toàn cảnh nhà hát':cameraControls.mode==='avatar'?'Góc nhìn avatar':api.owner===me()?'Trên sân khấu':'Góc nhìn thứ nhất'}
+ function angle(){web.domElement.dataset.cameraMode=cameraControls.mode;}
  function first(){if(cameraControls.mode==='overview')cameraControls.setMode('avatar',self);angle();if(self)pose(self)}
  function move(dx,dz){if(!self||self.seat>=0)return;const stage=api.owner===me();
  for(const [x,z] of [[self.x+dx,self.z],[null,self.z+dz]]){const p=position(x??self.x,z,stage);if(stage||clearSeat(p.x,p.z))Object.assign(self,p)}dirty=true}

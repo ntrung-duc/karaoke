@@ -31,7 +31,7 @@ const chat=createChat({send,getId:()=>id,isOpen:()=>!$('#chat').hidden,notice});
 output.apply();
 sound.onclick=()=>{output.toggle();notice('');};
 function send(m){return connection?.send(m)}
-let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){$('#angle').textContent='Trình duyệt cần bật WebGL để xem nhà hát';console.error(e)}
+let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){notice('Trình duyệt cần bật WebGL để xem nhà hát');console.error(e)}
 function stopMic(){stream?.getTracks().forEach(t=>t.stop());stream=null;for(const entry of peers.values())entry.pc.close();peers.clear()}
 function link(other){
  if(peers.has(other))return peers.get(other);
