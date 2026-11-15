@@ -8,3 +8,23 @@ export function movementKey(event){
   if(event.code&&event.code!=='Unidentified')return null;
   const key=event.key?.toLowerCase();return fallbackKeys.has(key)?key:null;
 }
+
+export function createMovementInput(){
+ const keys=new Set();
+ return {
+  keys,
+  press(event){
+   const key=movementKey(event);
+   if(!key||event.ctrlKey||event.altKey||event.metaKey)return null;
+   // A delayed IME/OS repeat must not re-latch a key after it was released.
+   if(event.repeat&&!keys.has(key))return null;
+   keys.add(key);return key;
+  },
+  release(event){
+   const key=movementKey(event);
+   if(key)keys.delete(key);
+   else if(!event.code||event.code==='Unidentified'||event.key==='Process')keys.clear();
+  },
+  clear(){keys.clear();},
+ };
+}
