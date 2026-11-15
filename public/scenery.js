@@ -58,16 +58,16 @@ export function createScenery(scene,box,mat){
  // Raise the singer's monitor above the stage lip; a slim stand meets its frame.
  box(1.72,1.22,-2.85,.08,.46,.08,gold);
  const chairs=addRecliners(scene,seats);
- // Painted end wall, facing the audience when they turn away from the stage.
- const mural=document.createElement('canvas');mural.width=2048;mural.height=640;
- const ink=mural.getContext('2d');ink.fillStyle='#1e1b30';ink.fillRect(0,0,2048,640);
- ink.lineJoin='round';ink.lineCap='round';
- for(let i=0;i<5;i++){ink.strokeStyle=['#544276','#765478','#467384','#51466b','#735c7c'][i];ink.lineWidth=4;ink.beginPath();
- for(let x=0;x<=2048;x+=8){const y=320+Math.sin(x/170+i*.38)*62+i*18;if(!x)ink.moveTo(x,y);else ink.lineTo(x,y)}ink.stroke()}
- const stamps=['♫','✦','♪','★','♬','✧','♫','✦','♪','♬','★','✧'];
- stamps.forEach((mark,i)=>{ink.save();ink.translate(80+i*171,165+(i%3)*127);ink.rotate((i%3-1)*.22);ink.font='bold '+(i%2?90:145)+'px Segoe UI Symbol';ink.strokeStyle='#100e21';ink.lineWidth=10;ink.strokeText(mark,-40,0);ink.fillStyle=['#b799df','#81a6b0','#cb9db1'][i%3];ink.fillText(mark,-40,0);ink.restore()});
- const paint=new T.CanvasTexture(mural);paint.colorSpace=T.SRGBColorSpace;
- const wallArt=new T.Mesh(new T.PlaneGeometry(18.9,5.9),new T.MeshBasicMaterial({map:paint,color:0x827a95}));wallArt.rotation.y=Math.PI;wallArt.position.set(0,3.2,16.65);scene.add(wallArt);
+ // One original mural on the rear wall only; the entrance overlays its quiet center.
+ const wallMaterial=new T.MeshBasicMaterial({color:'#17151e'});
+ if(typeof document.createElementNS==='function')new T.TextureLoader().load('/assets/rear-wall-mural.png',texture=>{
+  texture.colorSpace=T.SRGBColorSpace;
+  const ratio=(texture.image.width/texture.image.height)/(18.9/5.9);
+  if(ratio<1){texture.repeat.y=ratio;texture.offset.y=(1-ratio)/2;}
+  else{texture.repeat.x=1/ratio;texture.offset.x=(1-1/ratio)/2;}
+  wallMaterial.map=texture;wallMaterial.color.set('#ffffff');wallMaterial.needsUpdate=true;
+ });
+ const wallArt=new T.Mesh(new T.PlaneGeometry(18.9,5.9),wallMaterial);wallArt.name='RearWallMural';wallArt.rotation.y=Math.PI;wallArt.position.set(0,3.2,16.65);scene.add(wallArt);
  box(0,2,16.48,3.65,4,.3,'#817b96');
  for(const side of [-1,1]){box(side*.78,1.81,16.24,1.53,3.58,.18,'#aaaabc');box(side*.78,1.82,16.14,.036,3.46,.03,'#67697a')}
  box(0,3.86,16.23,.96,.22,.15,'#252431');box(2.12,1.37,16.37,.27,.46,.13,'#a3a1ad');
