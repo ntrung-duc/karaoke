@@ -11,6 +11,7 @@ test('only the singer can pause; the shared clock and deadline resume from the s
  const room=emptyRoom();for(const id of ['one','two'])joinMember(room,{id,connectionId:id,token:id},1000);
  const send=(id,message,now)=>applyMessage(room,id,id,message,now);
  send('one',{type:'queue',video:'abcdefghijk'},1000);const key=room.song.key;
+ send('one',{type:'playback',key,paused:false},2200);
  send('one',{type:'duration',key,video:'abcdefghijk',duration:10},1100);
  send('two',{type:'playback',key,paused:true},5000);assert.equal(room.song.pausedAt,undefined);
  send('one',{type:'playback',key,paused:true},5000);
@@ -71,6 +72,25 @@ test('server deadlines advance the queue and return each previous singer to the 
  assert.equal(second.users.find(u=>u.id===b.id).z,-4);
  send(a,{type:'next',key:first.key}); // a late retry cannot skip the next singer.
  send(b,{type:'duration',key:second.song.key,video:second.song.video,duration:.07});
+ assert.equal(second.song.awaitingStart,true,'the next singer gets preparation time too');
+ send(b,{type:'playback',key:second.song.key,paused:false});
  const done=await wait(b,m=>m.type==='state'&&!m.song&&m.users.find(u=>u.id===b.id)?.x===-5.9);
  assert.deepEqual(done.queue,[]);assert.equal(done.users.find(u=>u.id===b.id).z,-.95);
+});
+
+test('every turn waits at zero for its singer, without a deadline or spectator autoplay',()=>{
+ const room=emptyRoom();for(const id of ['one','two'])joinMember(room,{id,connectionId:id,token:id},1000);
+ const send=(id,message,now=2000)=>applyMessage(room,id,id,message,now);
+ send('one',{type:'queue',video:'abcdefghijk'});const key=room.song.key;
+ send('two',{type:'queue',video:'lmnopqrstuv'});
+ assert.equal(room.song.awaitingStart,true);assert.equal(songElapsed(room.song,50000),0);
+ send('one',{type:'duration',key,video:'abcdefghijk',duration:10});assert.equal(room.song.endAt,undefined);
+ send('two',{type:'playback',key,paused:false},3000);assert.equal(room.song.awaitingStart,true);
+ finishSong(room,key,50000);assert.equal(room.song.key,key,'waiting for mic test never consumes the song');
+ send('one',{type:'playback',key,paused:false},50000);
+ assert.equal(room.song.awaitingStart,undefined);assert.equal(room.song.pausedAt,undefined);assert.equal(room.song.start,50000);
+ assert.equal(songElapsed(room.song,50000),0);assert.equal(room.song.endAt,60000);
+ send('one',{type:'playback',key,paused:false},51000);assert.equal(room.song.start,50000,'repeated clicks do not restart playback');
+ finishSong(room,key,60000);assert.equal(room.song.owner,'two');assert.equal(room.song.awaitingStart,true);
+ assert.equal(songElapsed(room.song,90000),0);assert.equal(room.song.endAt,undefined);
 });

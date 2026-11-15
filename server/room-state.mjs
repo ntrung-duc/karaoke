@@ -20,7 +20,9 @@ function advance(room,now){
  if(previous)Object.assign(previous,{x:-5.9,z:-.95,seat:-1,mic:false,yaw:0,bodyYaw:0,pitch:0,...resetMotion});
  room.song=room.queue.shift()||null;
  if(room.song){
-  room.song.start=now+1200;
+  room.song.start=now;
+  room.song.pausedAt=now;
+  room.song.awaitingStart=true;
   Object.assign(room.users.get(room.song.owner).data,{x:0,z:-4,seat:-1,yaw:Math.PI,bodyYaw:Math.PI,pitch:0,...resetMotion});
  }
 }
@@ -126,7 +128,7 @@ export function applyMessage(room,id,connectionId,message,now){
    if(!singer||message.key!==room.song.key||typeof message.paused!=='boolean')return {events};
    const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return {events};
    if(message.paused){room.song.pausedAt=now;delete room.song.endAt;}
-   else{room.song.start+=Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
+   else{room.song.start=room.song.awaitingStart?now:room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
    break;
   }
   case 'duration':
