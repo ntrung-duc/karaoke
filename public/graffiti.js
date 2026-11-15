@@ -1,37 +1,43 @@
 import * as T from 'three';
 
-// Painted once into a shared texture; the scribbles cost no animation work.
-export function createGraffitiTexture({width=2048,height=640,seed=17,title=false}={}){
- const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
- const ink=canvas.getContext('2d');let state=seed;
- const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
- const colors=['#ff288e','#16e4ed','#ffe637','#ae4aff','#ff7833','#42f69b','#f3f0ff'];
- ink.fillStyle='#151321';ink.fillRect(0,0,width,height);ink.lineJoin='round';ink.lineCap='round';
- // Broad overlapping spray ribbons, marker loops and jagged hand-drawn lines.
- for(let i=0;i<85;i++){
-  const x=random()*width,y=random()*height,span=(.05+random()*.22)*width;
-  ink.strokeStyle=colors[i%colors.length];ink.globalAlpha=.4+random()*.5;ink.lineWidth=2+random()*height*.025;
-  ink.beginPath();ink.moveTo(x,y);
-  for(let j=1;j<=9;j++){const t=j/9;ink.lineTo(x+span*t,y+Math.sin(t*(5+random()*12))*height*(.03+random()*.15));}
-  ink.stroke();
- }
- ink.globalAlpha=1;
- for(let i=0;i<230;i++){
-  const x=random()*width,y=random()*height,r=1+random()*height*.009;
-  ink.fillStyle=colors[i%colors.length];ink.beginPath();ink.arc(x,y,r,0,Math.PI*2);ink.fill();
-  if(i%11===0){ink.strokeStyle=ink.fillStyle;ink.lineWidth=r*.7;ink.beginPath();ink.moveTo(x,y);ink.lineTo(x+random()*4,y+height*(.04+random()*.15));ink.stroke();}
- }
- const tags=['LOUD!','♫','VIBE','✦','SING!','♪','FLOW','★'];
- tags.forEach((tag,i)=>{
-  ink.save();ink.translate(width*(.035+(i%4)*.25),height*(i<4?.2:.84));ink.rotate((random()-.5)*.5);
-  ink.font=`900 italic ${height*(.13+random()*.06)}px Arial`;ink.strokeStyle='#11111a';ink.lineWidth=height*.018;ink.strokeText(tag,0,0);ink.fillStyle=colors[(i+2)%colors.length];ink.fillText(tag,0,0);
-  ink.restore();
+// Original images supplied by the user, kept intact and fitted to each wall bay.
+export const GRAFFITI_ART = [
+ {file:'crocodile.png',aspect:1},
+ {file:'einstein.png',aspect:386/518},
+ {file:'skull.png',aspect:480/640},
+ {file:'neon.png',aspect:1},
+];
+let library;
+export function graffitiMaterials(){
+ return library??=GRAFFITI_ART.map(art=>{
+  const material=new T.MeshBasicMaterial({color:'#ffffff'});
+  if(typeof document.createElementNS==='function'){
+   material.map=new T.TextureLoader().load('/assets/graffiti/'+art.file);
+   material.map.colorSpace=T.SRGBColorSpace;
+  }
+  return material;
  });
- if(title){
-  // A dark paint patch keeps the stage name readable through the wild layers.
-  ink.fillStyle='#11121de8';ink.beginPath();ink.moveTo(width*.13,height*.28);ink.lineTo(width*.89,height*.25);ink.lineTo(width*.86,height*.76);ink.lineTo(width*.11,height*.8);ink.closePath();ink.fill();
-  ink.textAlign='center';ink.font=`900 italic ${height*.25}px Arial`;ink.lineWidth=height*.025;ink.strokeStyle='#ff288e';ink.strokeText('Iron Dome',width*.5,height*.55);ink.lineWidth=height*.01;ink.strokeStyle='#181326';ink.strokeText('Iron Dome',width*.5,height*.55);ink.fillStyle='#fff6ed';ink.fillText('Iron Dome',width*.5,height*.55);
-  ink.font=`900 ${height*.092}px Arial`;ink.fillStyle='#ffe637';ink.fillText('K A R A O K E',width*.5,height*.7);
+}
+
+export function createStagePoster(){
+ const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=700;
+ const ink=canvas.getContext('2d'),texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;
+ const images=new Map();
+ function paint(){
+  ink.fillStyle='#09090c';ink.fillRect(0,0,1600,700);
+  // Fit each original image without stretching faces or cropping the artwork.
+  for(const [index,x,w] of [[0,0,590],[1,600,400],[2,1010,420]]){
+   const image=images.get(index);if(!image)continue;
+   const scale=Math.min(w/image.width,570/image.height),iw=image.width*scale,ih=image.height*scale;
+   ink.drawImage(image,x+(w-iw)/2,20+(570-ih)/2,iw,ih);
+  }
+  ink.fillStyle='#101015';ink.fillRect(0,590,1600,110);
+  ink.textAlign='center';ink.fillStyle='#f5f0e7';ink.font='900 italic 67px Arial';ink.fillText('Iron Dome',800,650);
+  ink.font='bold 22px Arial';ink.fillStyle='#f3d36d';ink.fillText('K A R A O K E',800,686);texture.needsUpdate=true;
  }
- const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;return texture;
+ paint();
+ if(typeof Image!=='undefined')for(let i=0;i<3;i++){
+  const image=new Image();image.onload=()=>{images.set(i,image);paint();};image.src='/assets/graffiti/'+GRAFFITI_ART[i].file;
+ }
+ return texture;
 }

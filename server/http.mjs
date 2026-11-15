@@ -7,6 +7,7 @@ const files = new Map([
   ['/', 'public/index.html'],
   ['/assets/mannequin.glb', 'public/assets/mannequin.glb'],
   ['/assets/face-atlas.png', 'public/assets/face-atlas.png'],
+  ...['crocodile.png','einstein.png','skull.png','neon.png'].map(file=>['/assets/graffiti/'+file,'public/assets/graffiti/'+file]),
   ['/assets/human-motions.json', 'public/assets/human-motions.json'],
   ...['three.module.js', 'three.core.js'].map(file => ['/lib/' + file, 'node_modules/three/build/' + file]),
   ['/lib/css.js', 'node_modules/three/examples/jsm/renderers/CSS3DRenderer.js'],
