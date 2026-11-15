@@ -56,7 +56,7 @@ export function createScenery(scene,box,mat){
  function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
  const rear=screen(0,3.88,-7.45,8.75,3.7,0);
  // A microphone on a stand in front of the singer, visible to the audience.
- const microphone=new T.Group();microphone.name='StageMicrophone';microphone.position.set(0,1.02,-3.3);scene.add(microphone);
+ const microphone=new T.Group();microphone.name='StageMicrophone';microphone.position.set(0,1.02,-2.95);scene.add(microphone);
  function micPart(geometry,color,x,y,z){const mesh=new T.Mesh(geometry,mat(color));mesh.position.set(x,y,z);microphone.add(mesh);return mesh;}
  micPart(new T.CylinderGeometry(.27,.29,.045,24),'#25252c',0,.025,0);
  micPart(new T.CylinderGeometry(.018,.023,1.24,10),'#45454e',0,.66,0);
