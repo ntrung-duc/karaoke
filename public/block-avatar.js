@@ -83,7 +83,7 @@ export function createAvatar(color,material) {
    placement['upperArm'+side]=[Math.sign(x)*.40,1.18,-.015];placement['forearm'+side]=[Math.sign(x)*.40,1.065,-.12];
   }
   for(const [name,p] of Object.entries(placement)){
-   const node=nodes.get(name);if(!node)continue;node.position.fromArray(p);
+   const node=nodes.get(name);if(!node)continue;node.position.fromArray(p);node.position.z-=.12;
    node.rotation.set(['thigh','foot','forearm'].some(prefix=>name.startsWith(prefix))?-Math.PI/2:0,Math.PI,0);
    if(name.startsWith('shin'))node.scale.y=1.55;
   }
