@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {seats} from './layout.js';
 import {addRecliners} from './recliner.js';
+import {createGraffitiTexture} from './graffiti.js';
 
 // All architectural boxes are static. Batch them after construction, retaining
 // their world transforms and shadow flags instead of drawing each box alone.
@@ -48,26 +49,22 @@ export function createScenery(scene,box,mat){
  for(let j=0;j<12;j++)box(x*.986,4.6,z-1.74+j*.31,.13,3.45+.25*Math.cos(j*.5),.075,'#93795f');
  }
  for(let i=0;i<8;i++){const z=-7+i*3.3;box(0,7.45,z,19.6,.22,3.28,'#bb9d7f');box(0,7.29,z-1.55,19,.065,.084,'#fff0ce')}
- for(const x of [-9.65,9.65])box(x,6.8,4,.23,1.4,26,'#ab9077');box(0,3.6,16.8,19.6,7.6,.22,'#443e58'); function art(){
- const c=document.createElement('canvas');c.width=1200;c.height=500;const a=c.getContext('2d'),g=a.createLinearGradient(0,0,1200,500);g.addColorStop(0,'#32192b');g.addColorStop(.55,'#682d43');g.addColorStop(1,'#361e31');a.fillStyle=g;a.fillRect(0,0,1200,500);a.strokeStyle='#bc925d';a.lineWidth=3;a.strokeRect(20,20,1160,460);a.strokeRect(30,30,1140,440);
- for(let i=0;i<15;i++){a.beginPath();a.arc(600,720,345+i*14,Math.PI,Math.PI*2);a.strokeStyle='rgba(233,185,128,.15)';a.stroke()}
- a.textAlign='center';a.fillStyle='#f3d99f';a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
- const poster=new T.MeshBasicMaterial({map:art()}),hole=new T.MeshBasicMaterial({color:0,opacity:0,blending:T.NoBlending,side:T.FrontSide});
+ for(const x of [-9.65,9.65])box(x,6.8,4,.23,1.4,26,'#ab9077');box(0,3.6,16.8,19.6,7.6,.22,'#443e58');
+ const poster=new T.MeshBasicMaterial({map:createGraffitiTexture({width:1600,height:700,title:true,seed:31})}),hole=new T.MeshBasicMaterial({color:0,opacity:0,blending:T.NoBlending,side:T.FrontSide});
  function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
  const rear=screen(0,3.88,-7.45,8.75,3.7,0),front=screen(1.72,1.85,-2.85,1.78,.67,Math.PI+.3);
  // Raise the singer's monitor above the stage lip; a slim stand meets its frame.
  box(1.72,1.22,-2.85,.08,.46,.08,gold);
  const chairs=addRecliners(scene,seats);
  // Painted end wall, facing the audience when they turn away from the stage.
- const mural=document.createElement('canvas');mural.width=2048;mural.height=640;
- const ink=mural.getContext('2d');ink.fillStyle='#1e1b30';ink.fillRect(0,0,2048,640);
- ink.lineJoin='round';ink.lineCap='round';
- for(let i=0;i<5;i++){ink.strokeStyle=['#544276','#765478','#467384','#51466b','#735c7c'][i];ink.lineWidth=4;ink.beginPath();
- for(let x=0;x<=2048;x+=8){const y=320+Math.sin(x/170+i*.38)*62+i*18;if(!x)ink.moveTo(x,y);else ink.lineTo(x,y)}ink.stroke()}
- const stamps=['♫','✦','♪','★','♬','✧','♫','✦','♪','♬','★','✧'];
- stamps.forEach((mark,i)=>{ink.save();ink.translate(80+i*171,165+(i%3)*127);ink.rotate((i%3-1)*.22);ink.font='bold '+(i%2?90:145)+'px Segoe UI Symbol';ink.strokeStyle='#100e21';ink.lineWidth=10;ink.strokeText(mark,-40,0);ink.fillStyle=['#b799df','#81a6b0','#cb9db1'][i%3];ink.fillText(mark,-40,0);ink.restore()});
- const paint=new T.CanvasTexture(mural);paint.colorSpace=T.SRGBColorSpace;
- const wallArt=new T.Mesh(new T.PlaneGeometry(18.9,5.9),new T.MeshBasicMaterial({map:paint,color:0x827a95}));wallArt.rotation.y=Math.PI;wallArt.position.set(0,3.2,16.65);scene.add(wallArt);
+ const paint=createGraffitiTexture({seed:71});
+ const wallArt=new T.Mesh(new T.PlaneGeometry(18.9,5.9),new T.MeshBasicMaterial({map:paint}));wallArt.rotation.y=Math.PI;wallArt.position.set(0,3.2,16.65);scene.add(wallArt);
+ // Graffiti panels along both side walls, below the acoustic timber slats.
+ const sidePaint=[11,29,53].map(seed=>new T.MeshBasicMaterial({map:createGraffitiTexture({width:1200,height:500,seed})}));
+ for(const sign of [-1,1])for(let i=0;i<6;i++){
+  const panel=new T.Mesh(new T.PlaneGeometry(3.8,1.4),sidePaint[i%3]);panel.name='SideWallGraffiti';
+  panel.rotation.y=-sign*Math.PI/2;panel.position.set(sign*9.48,.9,-5.2+i*4.1);scene.add(panel);
+ }
  box(0,2,16.48,3.65,4,.3,'#817b96');
  for(const side of [-1,1]){box(side*.78,1.81,16.24,1.53,3.58,.18,'#aaaabc');box(side*.78,1.82,16.14,.036,3.46,.03,'#67697a')}
  box(0,3.86,16.23,.96,.22,.15,'#252431');box(2.12,1.37,16.37,.27,.46,.13,'#a3a1ad');
