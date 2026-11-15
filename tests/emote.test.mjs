@@ -23,7 +23,7 @@ test('only the current singer starts an emote; movement, jump and end of turn st
 
 test('extracted dance loops on a shared clock and restores normal motion',async t=>{
  const original=globalThis.fetch;t.after(()=>globalThis.fetch=original);
- globalThis.fetch=async path=>({ok:true,json:async()=>JSON.parse(await readFile(new URL('../public'+path,import.meta.url),'utf8'))});
+ globalThis.fetch=async path=>({ok:true,json:async()=>JSON.parse(await readFile(new URL('../public'+path,import.meta.url),'utf8')),arrayBuffer:async()=>{const b=await readFile(new URL('../public'+path,import.meta.url));return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);}});
  const avatar=createAvatar();t.after(()=>avatar.dispose());await avatar.ready;await avatar.prepareDance();
  const json=JSON.parse(await readFile(new URL('../public/assets/parker-dance.json',import.meta.url)));
  const duration=json.clip.duration;assert.ok(duration>10&&duration<11);
@@ -32,10 +32,10 @@ test('extracted dance loops on a shared clock and restores normal motion',async 
   avatar.update(.016,'parker',0,0,true,i/20);avatar.body.updateMatrixWorld(true);
   const box=new T.Box3().setFromObject(avatar.body);
   assert.ok(box.min.toArray().every(Number.isFinite)&&box.max.toArray().every(Number.isFinite));
-  assert.ok(box.max.y<2.8&&box.max.x-box.min.x<2.5,'retargeted proportions stay bounded');minY=Math.min(minY,box.min.y);
+  assert.ok(box.max.y<2.8&&box.max.x-box.min.x<2.8,'retargeted proportions stay bounded');minY=Math.min(minY,box.min.y);
  }
  assert.ok(minY>-.15,'feet remain near the stage surface');
- avatar.update(0,'parker',0,0,true,1.25);const head=avatar.body.getObjectByName('head').position.clone();
- avatar.update(.1,'parker',0,0,true,1.25+duration*10);assert.ok(head.distanceTo(avatar.body.getObjectByName('head').position)<1e-6);
+ avatar.update(0,'parker',0,0,true,1.25);avatar.body.updateMatrixWorld(true);const head=avatar.body.getObjectByName('head').getWorldPosition(new T.Vector3());
+ avatar.update(.1,'parker',0,0,true,1.25+duration*10);avatar.body.updateMatrixWorld(true);assert.ok(head.distanceTo(avatar.body.getObjectByName('head').getWorldPosition(new T.Vector3()))<1e-6);
  avatar.update(.016,'walkForward',0,0,true);assert.equal(avatar.state,'walkForward');
 });

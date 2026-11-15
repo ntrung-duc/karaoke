@@ -13,7 +13,7 @@ test('two users receive validated movement, authoritative jumps and seat resets'
   child.stdout.on('data',d=>{output+=d;const m=output.match(/localhost:(\d+)/);if(m){clearTimeout(timer);resolve(m[1]);}});
   child.once('error',reject);
  });
- for(const path of ['/input.js','/player-state.js','/camera-controls.js','/avatar.js','/avatar-head.js','/block-avatar.js','/toy-avatar.js','/faces.js','/avatar-settings.js','/scenery.js','/session.js','/motion.js','/assets/face-atlas.png','/assets/human-motions.json','/assets/mannequin.glb','/lib/loaders/GLTFLoader.js','/lib/utils/BufferGeometryUtils.js','/lib/utils/SkeletonUtils.js']){
+ for(const path of ['/roblox-avatar.js','/assets/roblox-noob.glb','/input.js','/player-state.js','/camera-controls.js','/avatar.js','/avatar-head.js','/block-avatar.js','/toy-avatar.js','/faces.js','/avatar-settings.js','/scenery.js','/session.js','/motion.js','/assets/face-atlas.png','/assets/human-motions.json','/assets/mannequin.glb','/lib/loaders/GLTFLoader.js','/lib/utils/BufferGeometryUtils.js','/lib/utils/SkeletonUtils.js']){
   const response=await fetch(`http://127.0.0.1:${port}${path}`);assert.equal(response.status,200);
   if(path.endsWith('.json'))assert.match(response.headers.get('content-type'),/application\/json/);
   if(path.endsWith('.glb'))assert.equal(response.headers.get('content-type'),'model/gltf-binary');

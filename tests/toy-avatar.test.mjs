@@ -2,57 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import * as T from 'three';
-import {createAvatar} from '../public/avatar.js';
+import {createAvatar,loadMotions} from '../public/avatar.js';
 import {SKINS} from '../public/avatar-settings.js';
 
-test('smooth clothed toy keeps skin, shirt, pants and shoes independent across motion states',async t=>{
- const fetchBefore=globalThis.fetch;t.after(()=>globalThis.fetch=fetchBefore);
- globalThis.fetch=async()=>({ok:true,json:async()=>JSON.parse(await readFile(new URL('../public/assets/human-motions.json',import.meta.url)))});
- const avatar=createAvatar(),other=createAvatar();await Promise.all([avatar.ready,other.ready]);
- t.after(()=>{avatar.dispose();other.dispose();});
- const shell=avatar.body.getObjectByName('ToyHeadShell'),torso=avatar.body.getObjectByName('ToyShirt-torso');
- assert.ok(shell);assert.ok(avatar.body.getObjectByName('ToyFace'));
- const helmet=avatar.body.getObjectByName('AvatarBlackHelmet');assert.ok(helmet);
- assert.equal(helmet.parent,shell.parent,'helmet follows independent head rotation');
- torso.geometry.computeBoundingBox();assert.ok(torso.geometry.boundingBox.max.z<.18,'shirt has no muscle relief');
- assert.equal(avatar.body.getObjectByName('ToyMuscles-torso'),undefined);
- avatar.setShirt('#ff4477');
- const pants=avatar.body.getObjectByName('ToyPants-thighL'),shoes=avatar.body.getObjectByName('ToyShoes-footL');
- const pantsColor=pants.material.color.getHexString(),shoesColor=shoes.material.color.getHexString();
- avatar.setSkin(5);
- assert.equal(helmet.material.color.getHexString(),'181c1e','skin and shirt choices leave the helmet black');
- avatar.body.traverse(o=>{if(o.name.startsWith('ToySkin-')||o.name==='ToyHeadShell')assert.equal(o.material.color.getHexString(),SKINS[5].color.slice(1));if(o.name.startsWith('ToyShirt-'))assert.equal(o.material.color.getHexString(),'ff4477');});
- assert.equal(pants.material.color.getHexString(),pantsColor);assert.equal(shoes.material.color.getHexString(),shoesColor);
- assert.notEqual(pantsColor,shoesColor);
- assert.notEqual(other.body.getObjectByName('ToyShirt-torso').material.color.getHexString(),'ff4477');
- assert.equal(other.body.getObjectByName('ToyHeadShell').material.color.getHexString(),SKINS[0].color.slice(1));
- const rig=avatar.body.children[0];
- avatar.update(0,'idle',0,0);
- const rest=rig.children.map(n=>n.position.clone());
- for(let i=0;i<30;i++)avatar.update(0,'idle',i*.2,.1);
- rig.children.forEach((n,i)=>assert.ok(n.position.distanceTo(rest[i])<1e-6,'look input must not spread the body or change joint placement'));
- assert.equal(avatar.body.rotation.y,0);
- avatar.update(0,'sit',0,0);avatar.body.updateMatrixWorld(true);
- const boundsOf=name=>new T.Box3().setFromObject(avatar.body.getObjectByName(name));
- function gap(a,b){const one=boundsOf(a),two=boundsOf(b);return Math.hypot(...['x','y','z'].map(axis=>Math.max(0,one.min[axis]-two.max[axis],two.min[axis]-one.max[axis])));}
- for(const side of ['L','R']){
-  assert.ok(gap('torso','upperArm'+side)<.025,'shoulder stays connected to shirt');
-  assert.ok(gap('upperArm'+side,'forearm'+side)<.025,'elbow connects to forearm');
-  assert.ok(gap('hips','thigh'+side)<.025,'thigh joins hips');
-  assert.ok(gap('thigh'+side,'shin'+side)<.025,'knee joins thigh and shin');
-  assert.ok(gap('shin'+side,'foot'+side)<.025,'shoe joins ankle');
-  assert.equal(avatar.body.getObjectByName('shin'+side).scale.y,1,'seated lower legs keep their short natural length');
-  assert.ok(boundsOf('foot'+side).min.y>.15,'seated feet may hang above the floor');
-  assert.ok(Math.abs(avatar.body.getObjectByName('forearm'+side).position.x)<.45,'arms do not spread beyond the armrests');
+test('supplied Roblox model has six independent rigid parts, old walk clips and configurable appearance',async t=>{
+ const original=globalThis.fetch;t.after(()=>globalThis.fetch=original);
+ globalThis.fetch=async path=>({ok:true,json:async()=>JSON.parse(await readFile(new URL('../public'+path,import.meta.url),'utf8')),arrayBuffer:async()=>{const b=await readFile(new URL('../public'+path,import.meta.url));return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);}});
+ const {gltf,clips}=await loadMotions(),bounds=new T.Box3().setFromObject(gltf.scene);
+ assert.ok(Math.abs(bounds.max.y-bounds.min.y-1.8)<.001);
+ let triangles=0;gltf.scene.traverse(o=>{if(o.isMesh)triangles+=o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count;});assert.equal(triangles,3198,'all source triangles are retained');
+ assert.ok(clips.some(c=>c.name==='walkForward'));
+ const one=createAvatar(),two=createAvatar();await Promise.all([one.ready,two.ready]);t.after(()=>{one.dispose();two.dispose();});
+ assert.notEqual(one.body.getObjectByName('Joint-armL'),two.body.getObjectByName('Joint-armL'));
+ one.setShirt('#ff4477');one.setSkin(5);
+ const colors={};one.body.traverse(o=>{if(o.isMesh)colors[o.material.name]=o.material.color.getHexString();});
+ assert.equal(colors.Suit,'ff4477');assert.equal(colors.Skin,SKINS[5].color.slice(1));assert.equal(colors.Pants,'263449');
+ assert.ok(one.body.getObjectByName('AvatarFace'));assert.equal(one.body.getObjectByName('AvatarBlackHelmet'),undefined);
+ one.body.updateMatrixWorld(true);assert.ok(one.head.getWorldPosition(new T.Vector3()).y>1.3,'head stays above the torso');
+ for(const state of ['idle','walkForward','walkBackward','walkRight','sit','jump','fall','land']){
+  for(let i=0;i<20;i++){
+   one.update(.016,state,0,0,true);one.body.updateMatrixWorld(true);const box=new T.Box3().setFromObject(one.body);
+   assert.ok(box.min.toArray().every(Number.isFinite)&&box.max.toArray().every(Number.isFinite));
+   assert.ok(box.max.x-box.min.x<3&&box.max.y<2.8,state+' stays bounded');
+  }
  }
- for(let i=0;i<10;i++)avatar.update(.016,'sit',i*.2,.1);
- assert.ok(Math.abs(avatar.body.getObjectByName('forearmL').position.x)<.45);
- avatar.update(.016,'idle',0,0);
- assert.equal(avatar.body.getObjectByName('shinL').scale.y,1,'standing restores normal leg dimensions');
- for(const state of ['sit','idle','walkForward','runBackwardRight','jump','fall','land']){
-  avatar.update(.016,state,Math.PI,.2);avatar.body.updateMatrixWorld(true);
-  const bounds=new T.Box3().setFromObject(avatar.body);
-  assert.ok(bounds.min.toArray().every(Number.isFinite)&&bounds.max.toArray().every(Number.isFinite));
-  assert.ok(bounds.max.x-bounds.min.x<2.5&&bounds.max.y<2.5,state+' keeps plausible proportions');
- }
+ one.update(.016,'jump',0,0,true);assert.equal(Math.abs(one.body.getObjectByName('Joint-legL').rotation.x),0,'no jump crouch or knee lift');
+ one.update(.016,'fall',0,0,true);assert.equal(Math.abs(one.body.getObjectByName('Joint-legR').rotation.x),0);
+ const torso=one.body.getObjectByName('Joint-torso');const before=torso.quaternion.clone();one.update(0,'fall',1.2,.2,true);assert.ok(torso.quaternion.angleTo(before)<1e-6,'look input only turns the head');
 });

@@ -1,4 +1,4 @@
-const physicalKeys={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright',ShiftLeft:'shift',ShiftRight:'shift'};
+const physicalKeys={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright'};
 const fallbackKeys=new Set(Object.values(physicalKeys));
 
 // IMEs can report key="Process" or a composed character while the physical
@@ -15,7 +15,7 @@ export function createMovementInput(clock=()=>performance.now()){
   const now=clock(),dt=Math.min(.1,Math.max(0,(now-previous)/1000));previous=now;
   const f=Number(keys.has('w')||keys.has('arrowup'))-Number(keys.has('s')||keys.has('arrowdown'));
   const r=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
-  const length=Math.hypot(f,r);if(length){const step=dt*(keys.has('shift')?2:1)/length;forward+=f*step;right+=r*step;}
+  const length=Math.hypot(f,r);if(length){const step=dt/length;forward+=f*step;right+=r*step;}
  }
  return {
   keys,

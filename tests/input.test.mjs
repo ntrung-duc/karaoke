@@ -12,10 +12,10 @@ test('press and release between render frames still produces movement exactly on
  time=64;assert.ok(Math.abs(input.sample().right+.01)<1e-9);
 });
 
-test('held movement is independent of repeat events, normalized diagonally and stops on blur',()=>{
+test('held movement ignores Shift, normalizes diagonals and stops on blur',()=>{
  let time=0;const input=createMovementInput(()=>time);
  input.press({code:'KeyW'});input.press({code:'KeyD'});input.press({code:'ShiftLeft'});
- time=20;const first=input.sample();assert.ok(Math.abs(Math.hypot(first.forward,first.right)-.04)<1e-9);
+ time=20;const first=input.sample();assert.ok(Math.abs(Math.hypot(first.forward,first.right)-.02)<1e-9);
  time=40;const next=input.sample();assert.ok(Math.abs(next.forward-first.forward)<1e-9);
  input.clear();time=70;assert.equal(input.sample().forward,0);
 });
@@ -72,7 +72,7 @@ test('release uses the same physical key even when the composed character change
  const keys=new Set();keys.add(movementKey({code:'KeyW',key:'Process'}));
  keys.delete(movementKey({code:'KeyW',key:'ư'}));assert.equal(keys.size,0);
  assert.equal(movementKey({code:'ArrowLeft',key:'ArrowLeft'}),'arrowleft');
- assert.equal(movementKey({code:'ShiftRight',key:'Shift'}),'shift');
+ assert.equal(movementKey({code:'ShiftRight',key:'Shift'}),null);
  assert.equal(movementKey({code:'KeyQ',key:'w'}),null);
  assert.equal(movementKey({key:'w'}),'w');
 });

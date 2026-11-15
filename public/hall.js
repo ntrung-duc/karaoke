@@ -12,7 +12,7 @@ import {pathToSeat} from './navigation.js';
 import {createRenderBudget} from './render-budget.js';
 export function buildHall(view,send,me){
  const scene=new T.Scene(),overlay=new T.Scene(),camera=new T.PerspectiveCamera(62,1,.08,95);
- const web=new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Shift chạy, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
+ const web=new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
  const css=new CSS3DRenderer();Object.assign(css.domElement.style,{position:'absolute',inset:'0',pointerEvents:'none'});view.prepend(css.domElement);
  const renderBudget=createRenderBudget(Math.min(devicePixelRatio,1));let pixelRatio=web.getPixelRatio();
  const motionDebug=new URLSearchParams(location.search).has('motionDebug');let measuredInput=0,pendingInput=0,debugFrames=0,debugTime=0;
@@ -124,7 +124,7 @@ export function buildHall(view,send,me){
  },{passive:false});
  window.addEventListener('keydown',e=>{if(blocked()||editing(e.target))return;
  if(e.code==='Space'){if(e.target.closest('button'))return;e.preventDefault();cancelWalk();if(!e.repeat)jump();return;}
- const key=input.press(e);if(!key)return;e.preventDefault();if(key!=='shift')stopEmote();cancelWalk();if(cameraControls.mode==='overview')first();},true);
+ const key=input.press(e);if(!key)return;e.preventDefault();stopEmote();cancelWalk();if(cameraControls.mode==='overview')first();},true);
  window.addEventListener('keyup',e=>input.release(e),true);
  function releaseControls(){input.clear();cancelWalk();drag=null;hoverPoint=null;hideSeatHover();}
  window.addEventListener('blur',releaseControls);
@@ -152,8 +152,9 @@ export function buildHall(view,send,me){
  }
  const moved=Math.hypot(self.x-oldX,self.z-oldZ)>.00001;
  if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;self.emoteAt=0;}
- const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,keys.has('shift')):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
- camera.position.set(self.x,api.owner===me()?2.55:self.seat>=0?1.88:1.55,self.z);
+ const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,false):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
+ const eyeHeight=self.seat>=0?1.80:1.61,orbitHeight=1.05;
+ camera.position.set(self.x,(api.owner===me()?1:0)+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
  if(cameraControls.mode==='avatar'){
   const {yaw,pitch,distance}=cameraControls,horizontal=Math.cos(pitch)*distance;
   camera.rotation.set(pitch,yaw,0,'YXZ');
