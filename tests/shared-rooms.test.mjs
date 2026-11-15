@@ -66,6 +66,8 @@ async function exerciseSharedRooms(t,stores){
  a.ws.send(JSON.stringify({type:'name',value:'Shirt check'}));
  const validated=await wait(b,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.name==='Shirt check');
  assert.equal(validated.users.find(u=>u.id===id).shirt,'#ff4477');
+ a.ws.send(JSON.stringify({type:'chat',text:'Xin chào cả phòng <b>test</b>',clientId:'shared-chat-001'}));
+ const chat=await wait(b,m=>m.type==='chat');assert.equal(chat.entry.userId,id);assert.equal(chat.entry.text,'Xin chào cả phòng <b>test</b>');
  a.ws.send(JSON.stringify({type:'queue',video:'abcdefghijk',title:'Keep this song'}));
  const singing=await wait(b,m=>m.type==='state'&&m.song?.owner===id),songKey=singing.song.key;
  b.ws.send(JSON.stringify({type:'queue',video:'lmnopqrstuv',title:'Next'}));
@@ -78,9 +80,10 @@ async function exerciseSharedRooms(t,stores){
  const restored=await wait(resumed,m=>m.type==='state'&&m.users.length===2&&m.song?.key===songKey);
  assert.equal(restored.users.find(u=>u.id===id).face,6);assert.equal(restored.users.find(u=>u.id===id).skin,4);
  assert.equal(restored.users.find(u=>u.id===id).shirt,'#ff4477');
+ assert.equal(restored.chat.at(-1).text,'Xin chào cả phòng <b>test</b>','chat survives reconnect to another instance');
  assert.equal(restored.queue.length,1);
  const isolated=await connect(0,undefined,'another');
- const separate=await wait(isolated,m=>m.type==='state');assert.equal(separate.users.length,1);assert.equal(separate.song,null);
+ const separate=await wait(isolated,m=>m.type==='state');assert.equal(separate.users.length,1);assert.equal(separate.song,null);assert.deepEqual(separate.chat,[]);
  const replaced=once(resumed.ws,'close'),duplicate=await connect(0,a.hello.resumeToken);
  await replaced;assert.equal(duplicate.hello.id,id,'session takeover preserves the room member');
  duplicate.ws.close();await once(duplicate.ws,'close');clock+=61000;

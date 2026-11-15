@@ -7,3 +7,4 @@ export function roomName(value) {
   const name = value || DEFAULT_ROOM;
   return /^[a-zA-Z0-9_-]{1,48}$/.test(name) ? name : null;
 }
+export const MAX_CHAT=400,MAX_CHAT_HISTORY=100;

@@ -1,17 +1,17 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {seats,position,clearSeat} from '../public/layout.js';
 import {gaits,jumpPose} from '../public/motion.js';
-import {MAX_QUEUE,MAX_NAME,MAX_TITLE} from '../public/session.js';
+import {MAX_QUEUE,MAX_NAME,MAX_TITLE,MAX_CHAT,MAX_CHAT_HISTORY} from '../public/session.js';
 import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-settings.js';
 
 export const PRESENCE_MS=60000;
 export const RESUME_GRACE_MS=45000;
 const resetMotion={gait:'idle',movingUntil:0,jumpAt:0};
 export const tokenDigest=token=>createHash('sha256').update(token).digest('hex');
-export const emptyRoom=()=>({users:new Map(),queue:[],song:null,revision:0});
+export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
-export const decodeRoom=raw=>raw?({...JSON.parse(raw),users:new Map(JSON.parse(raw).users)}):emptyRoom();
-export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song}:null,now,revision:room.revision});
+export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);return {...emptyRoom(),...value,users:new Map(value.users)};};
+export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song}:null,chat:(room.chat||[]).map(entry=>({...entry})),now,revision:room.revision});
 export const stateEvent=(room,now)=>({message:snapshot(room,now)});
 
 function advance(room,now){
@@ -60,6 +60,17 @@ export function applyMessage(room,id,connectionId,message,now){
  member.expiresAt=now+PRESENCE_MS;
  const data=member.data,singer=room.song?.owner===id;
  switch(message.type){
+  case 'chat':{
+   if(typeof message.text!=='string'||message.text.length>MAX_CHAT||typeof message.clientId!=='string'||! /^[\w-]{8,64}$/.test(message.clientId))return {events};
+   const text=message.text.trim();if(!text)return {events};
+   room.chat??=[];
+   if(room.chat.some(entry=>entry.userId===id&&entry.clientId===message.clientId))return {events};
+   if(Number.isFinite(member.chatAt)&&now-member.chatAt<500)return {events:[{to:id,message:{type:'error',message:'Bạn gửi hơi nhanh. Chờ một chút rồi gửi tiếp nhé.'}}]};
+   member.chatAt=now;
+   const entry={id:randomUUID(),clientId:message.clientId,userId:id,name:data.name,text,at:now};
+   room.chat.push(entry);if(room.chat.length>MAX_CHAT_HISTORY)room.chat.splice(0,room.chat.length-MAX_CHAT_HISTORY);
+   events.push({message:{type:'chat',entry,revision:room.revision}});return {events};
+  }
   case 'heartbeat':
    if(expireMembers(room,now))events.push(stateEvent(room,now));
    return {events,snapshot:snapshot(room,now)};

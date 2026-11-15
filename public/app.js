@@ -5,6 +5,7 @@ import {createFacePicker} from './faces.js';
 import {createConnection} from './connection.js';
 import {createAudioOutput} from './audio-output.js';
 import {createPlaybackMonitor,songElapsed} from './playback.js';
+import {createChat} from './chat.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',connected=false;
 let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
@@ -25,7 +26,9 @@ const peers=new Map(),notice=t=>$('#notice').textContent=t;
 const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 let lastPaused=false;
-const playback=createPlaybackMonitor(send);output.apply();
+const playback=createPlaybackMonitor(send);
+const chat=createChat({send,getId:()=>id,isOpen:()=>!$('#chat').hidden,notice});
+output.apply();
 sound.onclick=()=>{output.toggle();notice('');};
 function send(m){return connection?.send(m)}
 let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){$('#angle').textContent='Trình duyệt cần bật WebGL để xem nhà hát';console.error(e)}
@@ -60,7 +63,7 @@ window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player
 const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe_api';yt.onerror=()=>notice('Chưa kết nối được YouTube. Kiểm tra mạng để phát bài hát.');setInterval(()=>{if(song)sync()},1000);
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
- const old=song;song=m.song;users=m.users;if(song&&!yt.isConnected)document.head.append(yt);offset=m.now-Date.now();
+ const old=song;song=m.song;users=m.users;chat.history(m.chat||[]);if(song&&!yt.isConnected)document.head.append(yt);offset=m.now-Date.now();
  if(old?.key!==song?.key||stream&&song?.owner!==id||(!users.find(u=>u.id===song?.owner)?.mic&&!stream))stopMic();
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){e.pc.close();peers.delete(pid)}
  hall?.users(users,song?.owner,m.now);hall?.media(!!song);const mine=song?.owner===id,me=users.find(u=>u.id===id);
@@ -78,8 +81,9 @@ function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
  connection=createConnection({room,
   onHello(m){id=m.id;ice=m.ice;connected=true;hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
-  onMessage(m){if(m.type==='state')render(m);else if(m.type==='pose')hall?.peer(m.user);else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
+  onMessage(m){if(m.type==='state')render(m);else if(m.type==='chat')chat.receive(m.entry);else if(m.type==='pose')hall?.peer(m.user);else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
+   chat.connected(status==='connected');
    if(status==='connected'){$('#status').textContent='●　Trực tuyến';$('#pause').disabled=$('#next').disabled=false;return;}
    connected=false;$('#pause').disabled=$('#next').disabled=true;
    // Keep capture and song time across Function rotation. Rebuild peers only
@@ -106,6 +110,7 @@ function showPanel(name){
  const previous=selectedPanel;
  selectedPanel=name;
  drawer.hidden=!name;
+ if(name==='chat')chat.open();
  for(const control of switches){
   const selected=control.dataset.panel===name;
   control.setAttribute('aria-expanded',String(selected));
