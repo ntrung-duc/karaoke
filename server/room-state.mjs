@@ -58,11 +58,13 @@ export function applyMessage(room,id,connectionId,message,now){
    if(expireMembers(room,now))events.push(stateEvent(room,now));
    return {events,snapshot:snapshot(room,now)};
   case 'move':{
-   const {x,z,yaw,pitch,gait}=message;
+   const {x,z,yaw,bodyYaw,pitch,gait}=message;
    if(![x,z,yaw,pitch].every(Number.isFinite))return {events};
+   if(bodyYaw!==undefined&&!Number.isFinite(bodyYaw))return {events};
    const target=position(x,z,singer),allowed=data.seat<0&&(singer||clearSeat(target.x,target.z));
    const moved=allowed&&Math.hypot(target.x-data.x,target.z-data.z)>.0001;
    if(allowed)Object.assign(data,target);
+   if(allowed&&bodyYaw!==undefined)data.bodyYaw=wrapYaw(bodyYaw);
    data.gait=moved&&gaits.has(gait)?gait:'idle';data.movingUntil=moved?now+240:0;
    data.yaw=wrapYaw(yaw);data.pitch=Math.min(1,Math.max(-1,pitch));
    events.push({message:{type:'pose',user:{...data},revision:room.revision}});return {events};
@@ -87,7 +89,8 @@ export function applyMessage(room,id,connectionId,message,now){
    if(message.index===-1&&data.seat>=0){data.seat=-1;data.z-=.83;}
    else if(Number.isInteger(message.index)&&seats[message.index]&&![...room.users.values()].some(u=>u.data.seat===message.index))Object.assign(data,{seat:message.index,...seats[message.index]});
    else return {events};
-   Object.assign(data,resetMotion);break;
+   Object.assign(data,resetMotion);
+   if(data.seat>=0)Object.assign(data,{bodyYaw:0,yaw:0,pitch:0});break;
   case 'queue':
    if(typeof message.video!=='string'||! /^[\w-]{11}$/.test(message.video)||room.queue.length>=MAX_QUEUE)return {events};
    room.queue.push({owner:id,video:message.video,title:String(message.title||'Bài hát YouTube').slice(0,MAX_TITLE),key:randomUUID()});

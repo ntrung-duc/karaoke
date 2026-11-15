@@ -116,7 +116,9 @@ export function buildHall(view,send,me){
    if(walkTo&&!walkTo.route.length){send({type:'seat',index:walkTo.index});cancelWalk();document.querySelector('#notice').textContent='';}
   }
  }
- const moved=Math.hypot(self.x-oldX,self.z-oldZ)>.00001,gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,keys.has('shift')):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
+ const moved=Math.hypot(self.x-oldX,self.z-oldZ)>.00001;
+ if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;
+ const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,keys.has('shift')):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
  camera.position.set(self.x,api.owner===me()?2.55:self.seat>=0?1.88:1.55,self.z);
  if(cameraControls.mode==='avatar'){
   const {yaw,pitch,distance}=cameraControls,horizontal=Math.cos(pitch)*distance;
@@ -126,7 +128,7 @@ export function buildHall(view,send,me){
   camera.position.y=T.MathUtils.clamp(camera.position.y,.3,7);
  }else camera.rotation.set(self.pitch,self.yaw,0,'YXZ');
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
- if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
+ if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
  animateActors(dt);focusStage(dt);const monitor=cameraControls.mode!=='overview'&&me()&&api.owner===me()?front:rear;rear.mesh.material=active&&monitor===rear?hole:poster;front.mesh.material=active&&monitor===front?hole:poster;display.visible=active;display.position.set(monitor.x,monitor.y,monitor.z+.015*Math.cos(monitor.rot));display.rotation.y=monitor.rot;display.scale.set(monitor.w/800,monitor.h/450,1);web.render(scene,camera);css.render(overlay,camera);
  }

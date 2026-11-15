@@ -43,9 +43,10 @@ test('two users receive validated movement, authoritative jumps and seat resets'
  assert.equal(seated.users.find(u=>u.id===id).jumpAt,0);
  send({type:'seat',index:-1});
  await wait(one,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.seat===-1);
- send({type:'move',x:0,z:11,yaw:0,pitch:0,gait:'runForward'});
+ send({type:'move',x:0,z:11,yaw:Math.PI/2,bodyYaw:Math.PI/2,pitch:0,gait:'runForward'});
  const move=await wait(two,m=>m.type==='pose'&&m.user.id===id&&m.user.gait==='runForward');
  assert.equal(move.user.z,11);assert.ok(move.user.movingUntil>Date.now()-1000);
+ assert.equal(move.user.bodyYaw,Math.PI/2,'other players receive the facing direction');
  send({type:'jump'});
  const jump=await wait(two,m=>m.type==='pose'&&m.user.id===id&&m.user.jumpAt>0);
  assert.ok(Math.abs(Date.now()-jump.user.jumpAt)<1000);
@@ -60,4 +61,5 @@ test('two users receive validated movement, authoritative jumps and seat resets'
  const reset=await wait(two,m=>m.type==='state'&&m.users.find(u=>u.id===id)?.seat===0);
  assert.equal(reset.users.find(u=>u.id===id).jumpAt,0);
  assert.equal(reset.users.find(u=>u.id===id).gait,'idle');
+ assert.equal(reset.users.find(u=>u.id===id).bodyYaw,0,'sitting faces the stage again');
 });

@@ -32,6 +32,20 @@ test('movement animation matches camera-relative travel around a fixed body',()=
  assert.equal(displacementGait(0,-1,Math.PI,false),'walkBackward');
 });
 
+test('third-person travel turns the body forward while the orbit stays independent',()=>{
+ const controls=createCameraControls(),head={yaw:0,pitch:0,bodyYaw:0};controls.sync(head);
+ for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+  controls.turn(controls.yaw-yaw,0,head);const cameraYaw=controls.yaw;
+  for(const [dx,dz] of [[-Math.sin(yaw),-Math.cos(yaw)],[Math.cos(yaw),-Math.sin(yaw)],[Math.sin(yaw),Math.cos(yaw)]]){
+   assert.equal(controls.faceMovement(head,dx,dz),true);
+   assert.equal(displacementGait(dx,dz,head.bodyYaw,false),'walkForward');
+   assert.equal(head.yaw,head.bodyYaw);assert.equal(controls.yaw,cameraYaw);
+  }
+ }
+ const stopped={...head};assert.equal(controls.faceMovement(head,0,0),false);assert.deepEqual(head,stopped);
+ controls.setMode('first',head);const first={...head};assert.equal(controls.faceMovement(head,1,0),false);assert.deepEqual(head,first);
+});
+
 test('orbit rotates the third-person camera without changing avatar head or body',()=>{
   const controls=createCameraControls(),head={yaw:.2,pitch:.1,bodyYaw:0};controls.sync(head);
   const before={...head};

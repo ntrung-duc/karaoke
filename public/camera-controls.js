@@ -10,6 +10,10 @@ export function createCameraControls(){
   return {
     mode:'avatar',yaw:0,pitch:-.32,distance:DEFAULT_DISTANCE,initialized:false,
     movementHeading(head){return this.mode==='first'?head.yaw:this.yaw;},
+    faceMovement(head,dx,dz){
+      if(this.mode!=='avatar'||!head||Math.hypot(dx,dz)<.00001)return false;
+      head.bodyYaw=Math.atan2(-dx,-dz);head.yaw=head.bodyYaw;return true;
+    },
     sync(head,reset=false){
       if(!this.initialized||reset){
         this.yaw=head.yaw;this.pitch=clamp(head.pitch-(this.mode==='avatar'?.32:0),-1,1);
