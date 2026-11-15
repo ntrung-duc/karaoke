@@ -38,6 +38,8 @@ test('smooth clothed toy keeps skin, shirt, pants and shoes independent across m
   assert.ok(gap('hips','thigh'+side)<.025,'thigh joins hips');
   assert.ok(gap('thigh'+side,'shin'+side)<.025,'knee joins thigh and shin');
   assert.ok(gap('shin'+side,'foot'+side)<.025,'shoe joins ankle');
+  assert.equal(avatar.body.getObjectByName('shin'+side).scale.y,1,'seated lower legs keep their short natural length');
+  assert.ok(boundsOf('foot'+side).min.y>.15,'seated feet may hang above the floor');
   assert.ok(Math.abs(avatar.body.getObjectByName('forearm'+side).position.x)<.45,'arms do not spread beyond the armrests');
  }
  for(let i=0;i<10;i++)avatar.update(.016,'sit',i*.2,.1);

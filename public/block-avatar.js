@@ -79,13 +79,12 @@ export function createAvatar(color,material) {
   const placement={hips:[0,.88,0],torso:[0,1.08,0],head:[0,1.50,0]};
   for(const side of ['L','R']){
    const x=side==='L'?.17:-.17;
-   placement['thigh'+side]=[x,.77,-.20];placement['shin'+side]=[x,.435,-.40];placement['foot'+side]=[x,.08,-.47];
+   placement['thigh'+side]=[x,.77,-.20];placement['shin'+side]=[x,.535,-.40];placement['foot'+side]=[x,.28,-.47];
    placement['upperArm'+side]=[Math.sign(x)*.40,1.18,-.015];placement['forearm'+side]=[Math.sign(x)*.40,1.065,-.12];
   }
   for(const [name,p] of Object.entries(placement)){
    const node=nodes.get(name);if(!node)continue;node.position.fromArray(p);node.position.z-=.12;
    node.rotation.set(['thigh','foot','forearm'].some(prefix=>name.startsWith(prefix))?-Math.PI/2:0,Math.PI,0);
-   if(name.startsWith('shin'))node.scale.y=1.55;
   }
  }
  function setFace(index){
