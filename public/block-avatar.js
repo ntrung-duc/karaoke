@@ -31,7 +31,7 @@ export function createAvatar(color,material) {
   garment.customProgramCacheKey=()=> 'toy-clothing-fill-v1';
  }
  const yAxis=new T.Vector3(),zAxis=new T.Vector3(),xAxis=new T.Vector3(),front=new T.Vector3(0,0,-1),basis=new T.Matrix4();
- let mixer,actions={},current=null,failed=false,disposed=false,selectedFace=-1,decal;
+ let mixer,actions={},current=null,failed=false,disposed=false,selectedFace=-1,selectedSkin=0,selectedShirt=shirtColor(),lastYaw,lastPitch,decal;
  function mesh(name,size) {
   const node=new T.Group();node.name=name;rig.add(node);nodes.set(name,node);
   const fabric=name==='torso'||name.startsWith('upperArm')?shirt:name==='hips'||name.startsWith('thigh')||name.startsWith('shin')?pants:name.startsWith('foot')?shoes:skin;
@@ -111,8 +111,10 @@ export function createAvatar(color,material) {
    basis.makeBasis(xAxis,yAxis,zAxis);node.quaternion.setFromRotationMatrix(basis);
   }
  }
- return {body,head,ready,setFace,setShirt(value){shirt.color.set(shirtColor(value));},setSkin(index){skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch,immediate=false){
+ return {body,head,ready,setFace,setShirt(value){const color=shirtColor(value);if(selectedShirt===color)return;selectedShirt=color;shirt.color.set(color);},setSkin(index){if(selectedSkin===index)return;selectedSkin=index;skin.color.set(skinColor(index));skin.emissive.copy(skin.color);},get state(){return current;},update(dt,state,yaw,pitch,immediate=false){
   if(disposed||!mixer&&!failed)return;
+  if(state==='sit'&&current==='sit'&&lastYaw===yaw&&lastPitch===pitch)return;
+  lastYaw=yaw;lastPitch=pitch;
   for(const node of nodes.values()){node.scale.set(1,1,1);if(node.userData.motionX!==undefined)node.position.x=node.userData.motionX;}
   setState(state,immediate);if(state==='sit')seated();else mixer?.update(dt);
   if(state!=='sit')alignParts();

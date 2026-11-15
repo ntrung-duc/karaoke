@@ -3,16 +3,19 @@ import * as T from 'three';
 import {CSS3DRenderer,CSS3DObject} from '/lib/css.js';
 import {seats,position,clearSeat} from './layout.js';
 import {createAvatar,loadMotions} from './avatar.js';
-import {jumpPose,displacementGait,WALK_SPEED,RUN_SPEED} from './motion.js';
+import {jumpPose,displacementGait,WALK_SPEED} from './motion.js';
 import {relativeHeadYaw,faceIndex,skinIndex,shirtColor} from './avatar-settings.js';
 import {createCameraControls} from './camera-controls.js';
 import {standLocally,reconcilePlayer} from './player-state.js';
 import {createMovementInput} from './input.js';
 import {pathToSeat} from './navigation.js';
+import {createRenderBudget} from './render-budget.js';
 export function buildHall(view,send,me){
  const scene=new T.Scene(),overlay=new T.Scene(),camera=new T.PerspectiveCamera(62,1,.08,95);
- const web=new T.WebGLRenderer({antialias:true,alpha:true});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Shift chạy, Space nhảy');web.shadowMap.enabled=true;web.shadowMap.type=T.PCFShadowMap;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1.65));view.prepend(web.domElement);
+ const web=new T.WebGLRenderer({antialias:false,alpha:false,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Shift chạy, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
  const css=new CSS3DRenderer();Object.assign(css.domElement.style,{position:'absolute',inset:'0',pointerEvents:'none'});view.prepend(css.domElement);
+ const renderBudget=createRenderBudget(Math.min(devicePixelRatio,1));let pixelRatio=web.getPixelRatio();
+ const motionDebug=new URLSearchParams(location.search).has('motionDebug');let measuredInput=0,pendingInput=0,debugFrames=0,debugTime=0;
  const cube=new T.BoxGeometry(),materials=new Map(),palette=['#1684bd','#238ab8','#207eb2','#348ec2','#227aa8','#2888b8'];
  function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.79}));return materials.get(c)}
  function box(x,y,z,w,h,d,c,parent=scene){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
@@ -33,7 +36,7 @@ export function buildHall(view,send,me){
   if([...actors.values()].some(a=>a.user?.seat===index&&a.user.id!==me())){document.querySelector('#notice').textContent='Ghế này đã có người ngồi.';return;}
   if(self.seat===index)return;
   stand();first();const route=pathToSeat(self,index);
-  if(route){document.querySelector('#close').click();keys.clear();walkTo={index,route};document.querySelector('#notice').textContent='Đang đi đến ghế '+(index+1)+'. Bấm WASD để hủy.';}
+  if(route){document.querySelector('#close').click();input.clear();walkTo={index,route};document.querySelector('#notice').textContent='Đang đi đến ghế '+(index+1)+'. Bấm WASD để hủy.';}
  }
  const now=()=>Date.now()+clockOffset;
  loadMotions().catch(()=>{document.querySelector('#notice').textContent='Chưa tải được chuyển động avatar. Tải lại trang để thử lại.'});
@@ -49,7 +52,7 @@ export function buildHall(view,send,me){
  const moving=!sitting&&u.gait!=='idle'&&u.movingUntil>now();
  const base=a.facing??(u.bodyYaw??(singer?Math.PI:0));
  const target=sitting?0:(u.bodyYaw??(singer?Math.PI:0));
- a.facing=base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
+ a.facing=id===me()?target:base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
  a.body.position.y=(singer?1:0)+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
@@ -92,20 +95,22 @@ export function buildHall(view,send,me){
  },{passive:false});
  window.addEventListener('keydown',e=>{if(!document.querySelector('#drawer').hidden||e.target.closest('input,textarea,select,[contenteditable="true"]'))return;
  if(e.code==='Space'){e.preventDefault();cancelWalk();if(!e.repeat)jump();return;}
- const key=input.press(e);if(!key)return;e.preventDefault();cancelWalk();if(cameraControls.mode==='overview')first();});
+ const key=input.press(e);if(!key)return;e.preventDefault();cancelWalk();if(cameraControls.mode==='overview')first();},true);
  window.addEventListener('keyup',e=>input.release(e),true);
  function releaseControls(){input.clear();cancelWalk();drag=press=null;}
  window.addEventListener('blur',releaseControls);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseControls();});
  document.addEventListener('focusin',e=>{if(e.target.closest('input,textarea,select,button,[contenteditable="true"]'))input.clear();});
  document.querySelector('#jump').onpointerdown=e=>{e.preventDefault();cancelWalk();jump()};
- document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);cancelWalk();first();keys.add(b.dataset.key)};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>keys.delete(b.dataset.key)});
+ document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);cancelWalk();first();input.press({key:b.dataset.key})};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>input.release({key:b.dataset.key})});
  new ResizeObserver(()=>{const w=view.clientWidth,h=view.clientHeight;web.setSize(w,h);css.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}).observe(view);
- function draw(t){requestAnimationFrame(draw);const dt=Math.min(.1,(t-previous)/1000);previous=t;
+ function draw(t){requestAnimationFrame(draw);const frameMs=t-previous,dt=Math.min(.1,frameMs/1000);previous=t;
+ if(!document.hidden){const ratio=renderBudget.sample(frameMs);if(ratio!==pixelRatio){pixelRatio=ratio;web.setPixelRatio(ratio);}}
  if(cameraControls.mode!=='overview'&&self){const controls=document.querySelector('#drawer').hidden&&!document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');
- const f=controls?(Number(keys.has('w')||keys.has('arrowup'))-Number(keys.has('s')||keys.has('arrowdown'))):0,r=controls?(Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))):0;
+ if(!controls)input.clear();const movement=input.sample(),f=movement.forward,r=movement.right;
+ if(motionDebug&&(f||r)&&movement.lastPressAt!==measuredInput){measuredInput=movement.lastPressAt;pendingInput=measuredInput;}
  if((f||r)&&self.seat>=0)stand();
- const oldX=self.x,oldZ=self.z;if(f||r){const v=(keys.has('shift')?RUN_SPEED:WALK_SPEED)*dt/Math.hypot(f,r),heading=cameraControls.movementHeading(self);move((r*Math.cos(heading)-f*Math.sin(heading))*v,(-f*Math.cos(heading)-r*Math.sin(heading))*v)}
+ const oldX=self.x,oldZ=self.z;if(f||r){const heading=cameraControls.movementHeading(self);move((r*Math.cos(heading)-f*Math.sin(heading))*WALK_SPEED,(-f*Math.cos(heading)-r*Math.sin(heading))*WALK_SPEED)}
  if(walkTo&&controls){
   if([...actors.values()].some(a=>a.user?.seat===walkTo.index&&a.user.id!==me())){cancelWalk();document.querySelector('#notice').textContent='Ghế vừa có người ngồi. Hãy chọn ghế khác.';}
   else if(api.owner===me()||self.seat>=0)cancelWalk();
@@ -130,7 +135,12 @@ export function buildHall(view,send,me){
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
- animateActors(dt);focusStage(dt);const monitor=cameraControls.mode!=='overview'&&me()&&api.owner===me()?front:rear;rear.mesh.material=active&&monitor===rear?hole:poster;front.mesh.material=active&&monitor===front?hole:poster;display.visible=active;display.position.set(monitor.x,monitor.y,monitor.z+.015*Math.cos(monitor.rot));display.rotation.y=monitor.rot;display.scale.set(monitor.w/800,monitor.h/450,1);web.render(scene,camera);css.render(overlay,camera);
+ animateActors(dt);focusStage(dt);const monitor=cameraControls.mode!=='overview'&&me()&&api.owner===me()?front:rear;rear.mesh.material=active&&monitor===rear?hole:poster;front.mesh.material=active&&monitor===front?hole:poster;display.visible=active;display.position.set(monitor.x,monitor.y,monitor.z+.015*Math.cos(monitor.rot));display.rotation.y=monitor.rot;display.scale.set(monitor.w/800,monitor.h/450,1);web.render(scene,camera);if(active)css.render(overlay,camera);
+ if(motionDebug){
+  const data=web.domElement.dataset;data.playerX=String(self?.x);data.playerZ=String(self?.z);data.pixelRatio=String(pixelRatio);data.bodyYaw=String(actors.get(me())?.body.rotation.y);
+  if(pendingInput){data.inputFrameMs=(performance.now()-pendingInput).toFixed(1);pendingInput=0;}
+  if(frameMs>0&&frameMs<200){debugTime+=frameMs;if(++debugFrames===60){data.fps=(60000/debugTime).toFixed(1);debugTime=debugFrames=0;}}
+ }
  }
  requestAnimationFrame(draw);return api;
 }
