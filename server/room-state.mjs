@@ -34,7 +34,7 @@ export function expireMembers(room,now){
 }
 export function finishSong(room,key,now){
  const expired=expireMembers(room,now);
- const due=room.song?.key===key&&Number.isFinite(room.song.endAt)&&room.song.endAt<=now;
+ const due=room.song?.key===key&&!Number.isFinite(room.song.pausedAt)&&Number.isFinite(room.song.endAt)&&room.song.endAt<=now;
  if(due)advance(room,now);
  return {events:expired||due?[stateEvent(room,now)]:[]};
 }
@@ -104,10 +104,17 @@ export function applyMessage(room,id,connectionId,message,now){
   case 'next':
    if(!singer||message.key!==room.song.key)return {events};
    advance(room,now);break;
+  case 'playback':{
+   if(!singer||message.key!==room.song.key||typeof message.paused!=='boolean')return {events};
+   const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return {events};
+   if(message.paused){room.song.pausedAt=now;delete room.song.endAt;}
+   else{room.song.start+=Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
+   break;
+  }
   case 'duration':
    if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};
    if(room.song.duration===message.duration)return {events};
-   room.song.duration=message.duration;room.song.endAt=room.song.start+message.duration*1000;break;
+   room.song.duration=message.duration;if(!Number.isFinite(room.song.pausedAt))room.song.endAt=room.song.start+message.duration*1000;break;
   case 'mic':if(!singer)return {events};data.mic=!!message.on;break;
   case 'leave':removeMember(room,id,now);break;
   default:return {events};

@@ -3,8 +3,25 @@ import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {WebSocket} from 'ws';
 import {createAudioOutput} from '../public/audio-output.js';
-import {createPlaybackMonitor} from '../public/playback.js';
+import {createPlaybackMonitor,songElapsed} from '../public/playback.js';
 import {createApplication} from '../server/application.mjs';
+import {emptyRoom,joinMember,applyMessage,finishSong} from '../server/room-state.mjs';
+
+test('only the singer can pause; the shared clock and deadline resume from the same position',()=>{
+ const room=emptyRoom();for(const id of ['one','two'])joinMember(room,{id,connectionId:id,token:id},1000);
+ const send=(id,message,now)=>applyMessage(room,id,id,message,now);
+ send('one',{type:'queue',video:'abcdefghijk'},1000);const key=room.song.key;
+ send('one',{type:'duration',key,video:'abcdefghijk',duration:10},1100);
+ send('two',{type:'playback',key,paused:true},5000);assert.equal(room.song.pausedAt,undefined);
+ send('one',{type:'playback',key,paused:true},5000);
+ assert.equal(room.song.endAt,undefined);const position=songElapsed(room.song,5000);
+ assert.equal(songElapsed(room.song,20000),position);finishSong(room,key,20000);assert.equal(room.song.key,key);
+ send('one',{type:'duration',key,video:'abcdefghijk',duration:10.5},20000);assert.equal(room.song.endAt,undefined);
+ send('one',{type:'playback',key:'old',paused:false},20000);assert.equal(room.song.pausedAt,5000);
+ send('one',{type:'playback',key,paused:false},20000);
+ assert.equal(songElapsed(room.song,20000),position);assert.equal(room.song.endAt,room.song.start+10500);
+ finishSong(room,key,room.song.endAt);assert.equal(room.song,null);
+});
 
 test('local mute covers the player, existing voice and future voice without stopping playback',()=>{
  const saved=new Map(),calls=[],voice={muted:false,play(){calls.push('voice-play');return Promise.resolve();}},audio=[voice];
@@ -28,6 +45,7 @@ test('ended video polling retries safely and ignores stale events from the previ
  state=0;currentTime=10;check(10);assert.equal(sent.at(-1).type,'next');const count=sent.length;
  check(10);assert.equal(sent.length,count);time+=1600;check(12);assert.equal(sent.at(-1).key,'first');
  const next={...song,key:'second',duration:10};const before=sent.length;check(0,'one',next);assert.equal(sent.length,before,'same-video old ENDED must not skip a new song');
+ check(999,'one',{...next,pausedAt:11000});assert.equal(sent.length,before,'paused playback cannot time out');
  check(10,'spectator',next);assert.equal(sent.length,before,'only the singer reports completion');
  state=1;check(13,'one',next);assert.equal(sent.at(-1).key,'second','elapsed fallback catches a missing ENDED event');
 });
@@ -43,6 +61,11 @@ test('server deadlines advance the queue and return each previous singer to the 
  send(b,{type:'duration',key:first.key,video:first.video,duration:.07});
  send(b,{type:'name',value:'Cannot shorten'});const unchanged=await wait(a,m=>m.type==='state'&&m.users.some(u=>u.name==='Cannot shorten'));assert.equal(unchanged.song.endAt,undefined);
  send(a,{type:'duration',key:first.key,video:first.video,duration:.07});
+ send(a,{type:'playback',key:first.key,paused:true});await wait(a,m=>m.type==='state'&&Number.isFinite(m.song?.pausedAt));
+ await new Promise(r=>setTimeout(r,1400));send(a,{type:'name',value:'Still paused'});
+ const paused=await wait(a,m=>m.type==='state'&&m.users.some(u=>u.name==='Still paused'));
+ assert.equal(paused.song.key,first.key,'deadline is canceled while paused');
+ send(a,{type:'playback',key:first.key,paused:false});
  const second=await wait(b,m=>m.type==='state'&&m.song?.owner===b.id);
  const previous=second.users.find(u=>u.id===a.id);assert.equal(previous.x,-5.9);assert.equal(previous.z,-.95);assert.equal(previous.mic,false);
  assert.equal(second.users.find(u=>u.id===b.id).z,-4);

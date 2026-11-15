@@ -10,7 +10,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
  const clients=new Set(),channels=new Map();let stopping=false;
  function scheduleEnd(record,song){
   const channel=record.channel;if(!channel)return;
-  const version=song&&Number.isFinite(song.endAt)?song.key+':'+song.endAt:null;
+  const version=song&&!Number.isFinite(song.pausedAt)&&Number.isFinite(song.endAt)?song.key+':'+song.endAt:null;
   if(channel.endVersion===version)return;
   channel.endVersion=version;clearTimeout(channel.endTimer);
   if(!version)return;

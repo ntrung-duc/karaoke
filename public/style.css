@@ -4,3 +4,5 @@
 #skin-picker{width:100%;font:inherit;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;padding:10px}#skin-picker:focus-visible{outline:2px solid #c1adff}
 #shirt-picker{height:44px;padding:5px;cursor:pointer}
 
+
+#singer-controls{position:fixed;z-index:3;right:16px;bottom:18px;display:flex;gap:8px;padding:8px;background:#111320ed;border:1px solid #ffffff2a;border-radius:12px}#singer-controls button{font-size:13px}@media(max-width:600px){#singer-controls{bottom:12px;right:8px;gap:5px;padding:5px}}

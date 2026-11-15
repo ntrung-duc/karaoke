@@ -1,4 +1,4 @@
-export function createAudioOutput({getPlayer=()=>null,getAudio=()=>[],storage,onChange=()=>{}}={}){
+export function createAudioOutput({getPlayer=()=>null,getAudio=()=>[],canPlay=()=>true,storage,onChange=()=>{}}={}){
  let muted=false,blocked=false;
  try{muted=storage?.getItem('rap-muted')==='1';}catch{}
  function notify(){onChange({muted,label:muted||blocked?'Bật âm thanh':'Tắt âm thanh'});}
@@ -11,7 +11,7 @@ export function createAudioOutput({getPlayer=()=>null,getAudio=()=>[],storage,on
    const enable=muted||blocked;muted=!enable;blocked=false;
    try{storage?.setItem('rap-muted',muted?'1':'0');}catch{}
    apply();
-   if(enable){getPlayer()?.playVideo();for(const audio of getAudio())Promise.resolve(audio.play()).catch(block);}
+   if(enable){if(canPlay())getPlayer()?.playVideo();for(const audio of getAudio())Promise.resolve(audio.play()).catch(block);}
   },
  };
 }

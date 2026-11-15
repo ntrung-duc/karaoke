@@ -4,7 +4,7 @@ import {faceIndex,skinIndex,SKINS,shirtColor} from './avatar-settings.js';
 import {createFacePicker} from './faces.js';
 import {createConnection} from './connection.js';
 import {createAudioOutput} from './audio-output.js';
-import {createPlaybackMonitor} from './playback.js';
+import {createPlaybackMonitor,songElapsed} from './playback.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',connected=false;
 let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
@@ -23,7 +23,8 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
 facePicker.select(chosenFace);
 const peers=new Map(),notice=t=>$('#notice').textContent=t;
 const sound=$('#sound');
-const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
+const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
+let lastPaused=false;
 const playback=createPlaybackMonitor(send);output.apply();
 sound.onclick=()=>{output.toggle();notice('');};
 function send(m){return connection?.send(m)}
@@ -38,18 +39,21 @@ function link(other){
 async function offer(other){if(peers.has(other)||!stream)return;const {pc}=link(other);stream.getTracks().forEach(t=>pc.addTrack(t,stream));await pc.setLocalDescription(await pc.createOffer());send({type:'signal',to:other,signal:{desc:pc.localDescription}})}
 async function signal(m){const s=m.signal;if(!s||(!stream&&m.from!==song?.owner))return;
  const e=link(m.from);if(s.desc){await e.pc.setRemoteDescription(s.desc);for(const c of e.pending.splice(0))await e.pc.addIceCandidate(c);if(s.desc.type==='offer'){await e.pc.setLocalDescription(await e.pc.createAnswer());send({type:'signal',to:m.from,signal:{desc:e.pc.localDescription}})}}else if(s.candidate){if(e.pc.remoteDescription)await e.pc.addIceCandidate(s.candidate);else e.pending.push(s.candidate)}}
-const elapsed=()=>Math.max(0,(Date.now()+offset-song.start)/1000);
+const elapsed=()=>songElapsed(song,Date.now()+offset);
 function checkPlayback(){if(ready&&song)playback.check({song,id,player,elapsed:elapsed()});}
 function sync(){
  if(!ready)return;
- if(!song){player.stopVideo();lastSong='';return;}
- if(lastSong!==song.key){lastSong=song.key;player.loadVideoById({videoId:song.video,startSeconds:elapsed()});output.apply();return;}
+ if(!song){player.stopVideo();lastSong='';lastPaused=false;return;}
+ const paused=Number.isFinite(song.pausedAt),resumed=lastPaused&&!paused;lastPaused=paused;
+ if(lastSong!==song.key){lastSong=song.key;const video={videoId:song.video,startSeconds:elapsed()};if(paused)player.cueVideoById(video);else player.loadVideoById(video);output.apply();return;}
  checkPlayback();
+ if(paused){if(Math.abs(player.getCurrentTime()-elapsed())>.35)player.seekTo(elapsed(),true);if(![2,5].includes(player.getPlayerState()))player.pauseVideo();return;}
+ if(resumed){player.seekTo(elapsed(),true);player.playVideo();return;}
  if(player.getPlayerState()===1&&Math.abs(player.getCurrentTime()-elapsed())>2)player.seekTo(elapsed(),true);
 }
 window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:1,origin:location.origin},events:{
  onReady:()=>{ready=true;output.apply();sync();},
- onStateChange:()=>checkPlayback(),
+ onStateChange:()=>{if(Number.isFinite(song?.pausedAt)&&player.getPlayerState()===1)player.pauseVideo();checkPlayback();},
  onAutoplayBlocked:()=>{output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
  onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')
 }})};
@@ -62,13 +66,13 @@ function render(m){
  hall?.users(users,song?.owner,m.now);hall?.media(!!song);const mine=song?.owner===id,me=users.find(u=>u.id===id);
  facePicker.select(me?.face??chosenFace);
  skinPicker.value=skinIndex(me?.skin??chosenSkin);
- $('#next').hidden=!mine;$('#mic').disabled=!mine;$('#mic').textContent=stream?'Tắt mic':'Bật mic';$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length;$('#people').replaceChildren();$('#songs').replaceChildren();
+ $('#singer-controls').hidden=!mine;$('#pause').textContent=Number.isFinite(song?.pausedAt)?'▶ Tiếp tục':'⏸ Tạm dừng';$('#pause').disabled=$('#next').disabled=!connected;$('#mic').disabled=!mine;$('#mic').textContent=stream?'Tắt mic':'Bật mic';$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length;$('#people').replaceChildren();$('#songs').replaceChildren();
  for(const u of users)row($('#people'),(u.mic?'🎙 ':'●　')+u.name+(u.id===id?' (bạn)':'')+(u.id===song?.owner?' · Trên sân khấu':u.seat>=0?' · Ghế '+(u.seat+1):' · Đang đứng'));
  const ownerName=s=>users.find(u=>u.id===s.owner)?.name||'Khách';
  if(song)row($('#songs'),'♫　'+song.title+' · '+ownerName(song));else row($('#songs'),'Sân khấu đang trống.',true);
  m.queue.forEach((s,i)=>row($('#songs'),(i+1)+'. '+s.title+' · '+ownerName(s),true));
  if(stream&&mine&&me?.mic)users.filter(u=>u.id!==id).forEach(u=>offer(u.id).catch(()=>notice('Chưa kết nối được mic tới một người nghe.')));
- if(old?.key!==song?.key){notice('');sync()}
+ if(old?.key!==song?.key||old?.pausedAt!==song?.pausedAt){notice('');sync()}
 }
 function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
@@ -76,8 +80,8 @@ function connect(){
   onHello(m){id=m.id;ice=m.ice;connected=true;hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
   onMessage(m){if(m.type==='state')render(m);else if(m.type==='pose')hall?.peer(m.user);else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
-   if(status==='connected'){$('#status').textContent='●　Trực tuyến';return;}
-   connected=false;
+   if(status==='connected'){$('#status').textContent='●　Trực tuyến';$('#pause').disabled=$('#next').disabled=false;return;}
+   connected=false;$('#pause').disabled=$('#next').disabled=true;
    // Keep capture and song time across Function rotation. Rebuild peers only
    // after the room acknowledges mic, so listeners see the state before offers.
    if(stream){for(const entry of peers.values())entry.pc.close();peers.clear();}
@@ -87,6 +91,7 @@ function connect(){
 }
 $('#name').value=localStorage.getItem('rap-name')||'Khách';$('#name').onchange=()=>{localStorage.setItem('rap-name',$('#name').value);send({type:'name',value:$('#name').value})};
 $('#form').onsubmit=e=>{e.preventDefault();if(!connected)return notice('Đang chờ kết nối phòng.');let v;try{const u=new URL($('#url').value.trim());if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(u.hostname))v=u.searchParams.get('v')||u.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/)?.[1];else if(u.hostname==='youtu.be')v=u.pathname.slice(1)}catch{}if(!/^[\w-]{11}$/.test(v||''))return notice('Hãy dán liên kết đến một video YouTube.');send({type:'queue',video:v,title:$('#title').value.trim()||'Karaoke · '+v});e.target.reset();notice('Đã đăng ký bài hát.')};
+$('#pause').onclick=()=>{if(song?.owner===id)send({type:'playback',key:song.key,paused:!Number.isFinite(song.pausedAt)});};
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=async()=>{if(stream){stopMic();send({type:'mic',on:false});return}const current=song?.key;
  try{if(!navigator.mediaDevices)return notice('Mic cần HTTPS hoặc localhost.');const audio=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});if(song?.key!==current||!connected){audio.getTracks().forEach(t=>t.stop());return}stream=audio;send({type:'mic',on:true})}catch{notice('Chưa mở được mic. Kiểm tra quyền mic của trình duyệt.')}};
