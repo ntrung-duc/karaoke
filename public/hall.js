@@ -37,7 +37,7 @@ export function buildHall(view,send,me){
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
  seats.forEach((seat,index)=>seatProxy.setMatrixAt(index,seatMatrix.makeTranslation(seat.x,.9,seat.z+.04)));seatProxy.computeBoundingSphere();seatProxy.updateMatrixWorld(true);
- const seatOutline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(1.44,1.8,1.32)),new T.LineBasicMaterial({color:'#d5b5ff',depthTest:false,transparent:true,opacity:.9}));seatOutline.visible=false;seatOutline.renderOrder=999;scene.add(seatOutline);
+ const seatOutline=new T.Mesh(new T.RingGeometry(.66,.76,64),new T.MeshBasicMaterial({color:'#d5b5ff',side:T.DoubleSide,depthTest:false,depthWrite:false,transparent:true,opacity:.95}));seatOutline.rotation.x=-Math.PI/2;seatOutline.visible=false;seatOutline.renderOrder=999;scene.add(seatOutline);
  const tooltip=document.createElement('div');tooltip.id='seat-tooltip';tooltip.setAttribute('role','tooltip');tooltip.hidden=true;document.querySelector('main').append(tooltip);
  let hoverPoint=null,hoverDirty=false;
  function hideSeatHover(){seatOutline.visible=false;tooltip.hidden=true;}
@@ -52,7 +52,7 @@ export function buildHall(view,send,me){
   hoverDirty=false;if(!hoverPoint||drag||welcome.open){hideSeatHover();return;}
   const index=pickSeat(hoverPoint[0],hoverPoint[1]);if(index===null){hideSeatHover();return;}
   const seat=seats[index],occupant=[...actors.values()].find(a=>a.user?.seat===index)?.user;
-  seatOutline.position.set(seat.x,.9,seat.z+.04);seatOutline.material.color.set(occupant&&occupant.id!==me()?'#ffba78':'#d5b5ff');seatOutline.visible=true;
+  seatOutline.position.set(seat.x,.035,seat.z+.04);seatOutline.material.color.set(occupant&&occupant.id!==me()?'#ffba78':'#d5b5ff');seatOutline.visible=true;
   tooltip.textContent='Ghế '+(index+1)+' · '+(occupant?(occupant.id===me()?'Bạn đang ngồi':'Đã có người'):'Trống');tooltip.dataset.seat=String(index+1);tooltip.hidden=false;
   tooltip.style.left=Math.max(8,Math.min(innerWidth-190,hoverPoint[0]+14))+'px';tooltip.style.top=Math.max(8,Math.min(innerHeight-44,hoverPoint[1]-36))+'px';
  }
