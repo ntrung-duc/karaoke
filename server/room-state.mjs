@@ -3,10 +3,11 @@ import {seats,position,clearSeat} from '../public/layout.js';
 import {gaits,jumpPose} from '../public/motion.js';
 import {MAX_QUEUE,MAX_NAME,MAX_TITLE,MAX_CHAT,MAX_CHAT_HISTORY} from '../public/session.js';
 import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-settings.js';
+import {isEmote,emoteName} from '../public/emotes.js';
 
 export const PRESENCE_MS=60000;
 export const RESUME_GRACE_MS=45000;
-const resetMotion={gait:'idle',movingUntil:0,jumpAt:0,emoteAt:0};
+const resetMotion={gait:'idle',movingUntil:0,jumpAt:0,emoteAt:0,emote:'parker'};
 export const tokenDigest=token=>createHash('sha256').update(token).digest('hex');
 export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
@@ -91,7 +92,8 @@ export function applyMessage(room,id,connectionId,message,now){
    data.jumpAt=now;data.emoteAt=0;events.push({message:{type:'pose',user:{...data},revision:room.revision}});return {events};
   case 'emote':
    if(!singer||typeof message.on!=='boolean'||message.on&&(message.key!==room.song.key||jumpPose(data.jumpAt,now).state))return {events};
-   data.emoteAt=message.on?(data.emoteAt||now):0;
+   if(message.on&&message.emote!==undefined&&!isEmote(message.emote))return {events};
+   {const name=emoteName(message.emote);data.emoteAt=message.on?(data.emoteAt&&emoteName(data.emote)===name?data.emoteAt:now):0;if(message.on)data.emote=name;}
    data.gait='idle';data.movingUntil=0;
    break;
   case 'signal':

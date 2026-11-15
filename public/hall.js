@@ -10,6 +10,7 @@ import {standLocally,reconcilePlayer} from './player-state.js';
 import {createMovementInput,createSeatGesture} from './input.js';
 import {pathToSeat} from './navigation.js';
 import {createRenderBudget} from './render-budget.js';
+import {emoteName} from './emotes.js';
 export function buildHall(view,send,me){
  const scene=new T.Scene(),overlay=new T.Scene(),camera=new T.PerspectiveCamera(62,1,.08,95);
  const web=new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
@@ -84,7 +85,7 @@ export function buildHall(view,send,me){
  a.body.position.y=(singer?1:0)+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
- a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?'parker':'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);
+ a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
  function angle(){web.domElement.dataset.cameraMode=cameraControls.mode;}
@@ -98,7 +99,7 @@ export function buildHall(view,send,me){
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
  stopEmote();self.emoteAt=0;self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,async prepareEmote(){const generation=emoteGeneration;await actors.get(me())?.prepareDance();return generation===emoteGeneration;},emote(on){if(self)self.emoteAt=on?now():0;focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ const api={owner:null,async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();

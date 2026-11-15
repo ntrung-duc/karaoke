@@ -3,6 +3,8 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
 import {faceTexture} from './faces.js';
 import {faceIndex,skinColor,shirtColor} from './avatar-settings.js';
+import {emoteName,isEmote} from './emotes.js';
+import {loadWolfDance,applyWolfDance} from './wolf-dance.js';
 
 let library,danceLibrary,faceGeometry;
 export function loadMotions(){
@@ -16,7 +18,7 @@ function loadDance(){return danceLibrary??=fetch('/assets/parker-dance.json').th
 export function createAvatar(){
  const body=new T.Group(),rig=new T.Group(),head=new T.Group(),proxy=new T.Group(),nodes=new Map(),parts=new Map(),actions={};body.add(rig);
  const up=new T.Vector3(0,1,0),down=new T.Vector3(0,-1,0),direction=new T.Vector3(),lower=new T.Vector3(),torsoQ=new T.Quaternion(),lookQ=new T.Quaternion();
- let model,mixer,current,disposed=false,selectedFace=0,selectedSkin=0,selectedShirt=shirtColor(),decal,hipHeight=0,time=0,danceReady;
+ let model,mixer,current,disposed=false,selectedFace=0,selectedSkin=0,selectedShirt=shirtColor(),decal,hipHeight=0,time=0,danceReady,wolfReady,wolf;
  const pivots={torso:[0,.7057,0],head:[0,1.4114,0],armL:[.5293,1.4114,0],armR:[-.5293,1.4114,0],legL:[.1764,.7057,0],legR:[-.1764,.7057,0]};
  const ready=loadMotions().then(({gltf,clips})=>{
   if(disposed)return;model=clone(gltf.scene);
@@ -40,16 +42,20 @@ export function createAvatar(){
  }}
  function applyFace(){if(!decal)return;const index=selectedFace;faceTexture(index).then(texture=>{if(!disposed&&index===selectedFace){decal.material.map=texture;decal.material.needsUpdate=true;}}).catch(()=>{});}
  function setState(name,immediate=false){
-  if(name===current)return;const next=actions[name]||actions.idle,old=actions[current];next.reset().setEffectiveWeight(1).play();
-  if(old){if(immediate)old.stop();else next.crossFadeFrom(old,.12,false);}current=name;
+  if(name===current)return;const next=actions[name]||actions.idle,old=actions[current]||(current==='wolf'?actions.idle:undefined);next.reset().setEffectiveWeight(1).play();
+  if(old&&old!==next){if(immediate)old.stop();else next.crossFadeFrom(old,.12,false);}current=name;
  }
- function prepareDance(){return danceReady??=Promise.all([ready,loadDance()]).then(([,clip])=>{if(!disposed)actions.parker=mixer.clipAction(clip);}).catch(error=>{danceReady=null;throw error;});}
+ function prepareDance(name='parker'){
+  if(emoteName(name)==='wolf')return wolfReady??=Promise.all([ready,loadWolfDance()]).then(([,data])=>{if(!disposed)wolf=data;}).catch(error=>{wolfReady=null;throw error;});
+  return danceReady??=Promise.all([ready,loadDance()]).then(([,clip])=>{if(!disposed)actions.parker=mixer.clipAction(clip);}).catch(error=>{danceReady=null;throw error;});
+ }
  function update(dt,state,yaw=0,pitch=0,immediate=false,emoteElapsed=0){
   if(disposed||!mixer)return;time+=Math.min(.1,Math.max(0,dt));
   const seated=state==='sit',jumping=['jump','fall','land'].includes(state);
-  if(state==='parker'&&!actions.parker){prepareDance().catch(()=>{});state='idle';}
+  if(isEmote(state)&&(state==='wolf'?!wolf:!actions.parker)){prepareDance(state).catch(()=>{});state='idle';}
   setState(seated||jumping?'idle':state,immediate);
   if(state==='parker'){actions.parker.time=Math.max(0,emoteElapsed)%actions.parker.getClip().duration;mixer.update(0);}else mixer.update(dt);
+  rig.rotation.y=0;
   for(const [name,joint] of parts){joint.position.fromArray(pivots[name]);joint.quaternion.identity();}
   const torso=parts.get('torso');
   if(seated){
@@ -61,6 +67,8 @@ export function createAvatar(){
   }else if(jumping){
    for(const [side,sign] of [['L',1],['R',-1]])parts.get('arm'+side).rotation.x=Math.sin(time*7+sign)*.16;
   }else{
+   if(state==='wolf')applyWolfDance(parts,rig,wolf,emoteElapsed);
+   else{
    const lift=nodes.get('hips').position.y-hipHeight;
    torso.position.y+=lift;direction.subVectors(nodes.get('head').position,nodes.get('hips').position);torsoQ.setFromUnitVectors(up,direction.normalize());torso.quaternion.copy(torsoQ);
    head.position.set(0,.7057,0).applyQuaternion(torsoQ).add(torso.position);head.quaternion.copy(torsoQ);
@@ -69,6 +77,7 @@ export function createAvatar(){
     arm.position.set(sign*.5293,.7057,0).applyQuaternion(torsoQ).add(torso.position);
     direction.subVectors(nodes.get('forearm'+side).position,nodes.get('upperArm'+side).position).normalize();arm.quaternion.setFromUnitVectors(down,direction);
     leg.position.y+=lift;direction.subVectors(nodes.get('foot'+side).position,nodes.get('thigh'+side).position).normalize();leg.quaternion.setFromUnitVectors(down,direction);
+   }
    }
    // Ground the long rigid R6 legs using their actual animated geometry.
    body.updateMatrixWorld(true);let floor=Infinity;const point=new T.Vector3();
