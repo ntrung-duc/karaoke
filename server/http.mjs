@@ -5,6 +5,8 @@ const files = new Map([
   ...['index.html', 'app.js', 'connection.js', 'audio-output.js', 'playback.js', 'chat.js', 'youtube-search.js', 'hall.js', 'camera-controls.js', 'player-state.js', 'input.js', 'render-budget.js', 'scenery.js', 'recliner.js', 'navigation.js', 'avatar.js', 'roblox-avatar.js', 'avatar-head.js', 'block-avatar.js', 'toy-avatar.js', 'faces.js', 'avatar-settings.js', 'motion.js', 'session.js', 'layout.js', 'style.css']
     .map(file => ['/' + file, 'public/' + file]),
   ['/', 'public/index.html'],
+  ['/mic-test.js', 'public/mic-test.js'],
+  ['/mic-test-panel.js', 'public/mic-test-panel.js'],
   ['/emotes.js', 'public/emotes.js'],
   ['/wolf-dance.js', 'public/wolf-dance.js'],
   ['/assets/wolf-dance.json', 'public/assets/wolf-dance.json'],

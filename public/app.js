@@ -8,6 +8,7 @@ import {createPlaybackMonitor,songElapsed} from './playback.js';
 import {createChat} from './chat.js';
 import {createSongSearch} from './youtube-search.js';
 import {EMOTES,emoteName} from './emotes.js';
+import {createMicTestPanel} from './mic-test-panel.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 for(const emote of EMOTES){const option=document.createElement('option');option.value=emote.id;option.textContent=emote.name;$('#emote-choice').append(option);}$('#emote-choice').value='wolf';
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',connected=false;
@@ -26,6 +27,7 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
 });
 facePicker.select(chosenFace);
 const peers=new Map(),notice=t=>$('#notice').textContent=t;
+const micTest=createMicTestPanel({root:$('#mic-test-panel'),toggle:$('#test-mic'),canTest:()=>!stream,notice});
 const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 let lastPaused=false;
@@ -104,7 +106,8 @@ $('#emote-choice').onchange=()=>{const current=users.find(u=>u.id===id);$('#emot
 $('#pause').onclick=()=>{if(song?.owner===id)send({type:'playback',key:song.key,paused:!Number.isFinite(song.pausedAt)});};
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=async()=>{if(stream){stopMic();send({type:'mic',on:false});return}const current=song?.key;
- try{if(!navigator.mediaDevices)return notice('Mic cần HTTPS hoặc localhost.');const audio=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});if(song?.key!==current||!connected){audio.getTracks().forEach(t=>t.stop());return}stream=audio;send({type:'mic',on:true})}catch{notice('Chưa mở được mic. Kiểm tra quyền mic của trình duyệt.')}};
+ micTest.close();
+ try{if(!navigator.mediaDevices)return notice('Mic cần HTTPS hoặc localhost.');const audio=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});if(song?.key!==current||!connected){audio.getTracks().forEach(t=>t.stop());return}micTest.close();stream=audio;send({type:'mic',on:true})}catch{notice('Chưa mở được mic. Kiểm tra quyền mic của trình duyệt.')}};
 
 $('#invite').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',room);if(['localhost','127.0.0.1'].includes(u.hostname)){notice('Để mời bạn bè, mở phòng qua địa chỉ HTTPS dùng chung rồi sao chép liên kết.');return}try{await navigator.clipboard.writeText(u.href);notice('Đã sao chép liên kết phòng.')}catch{notice(u.href)}};
 
@@ -112,6 +115,7 @@ const drawer=$('#drawer');
 const switches=document.querySelectorAll('[data-panel]');
 let selectedPanel=null;
 function showPanel(name){
+ if(name!=='room')micTest.close();
  const previous=selectedPanel;
  selectedPanel=name;
  drawer.hidden=!name;
