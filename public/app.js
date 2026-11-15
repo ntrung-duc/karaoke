@@ -3,6 +3,8 @@ import {roomName} from './session.js';
 import {faceIndex,skinIndex,SKINS,shirtColor} from './avatar-settings.js';
 import {createFacePicker} from './faces.js';
 import {createConnection} from './connection.js';
+import {createAudioOutput} from './audio-output.js';
+import {createPlaybackMonitor} from './playback.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,offset=0,lastSong='',connected=false;
 let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
@@ -20,6 +22,10 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
 });
 facePicker.select(chosenFace);
 const peers=new Map(),notice=t=>$('#notice').textContent=t;
+const sound=$('#sound');
+const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready?player:null,getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label})=>{sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
+const playback=createPlaybackMonitor(send);output.apply();
+sound.onclick=()=>{output.toggle();notice('');};
 function send(m){return connection?.send(m)}
 let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){$('#angle').textContent='Trình duyệt cần bật WebGL để xem nhà hát';console.error(e)}
 function stopMic(){stream?.getTracks().forEach(t=>t.stop());stream=null;for(const entry of peers.values())entry.pc.close();peers.clear()}
@@ -27,15 +33,27 @@ function link(other){
  if(peers.has(other))return peers.get(other);
  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},...ice]});const entry={pc,pending:[]};peers.set(other,entry);
  pc.onicecandidate=e=>{if(e.candidate)send({type:'signal',to:other,signal:{candidate:e.candidate}})};
- pc.ontrack=e=>{const audio=document.createElement('audio');audio.autoplay=true;audio.srcObject=e.streams[0];entry.audio=audio;audio.play().catch(()=>notice('Chạm Bật âm thanh để nghe người hát.'))};return entry;
+ pc.ontrack=e=>{const audio=document.createElement('audio');audio.autoplay=true;audio.srcObject=e.streams[0];entry.audio=audio;output.attach(audio);audio.play().catch(()=>{output.block();if(!output.muted)notice('Chạm Bật âm thanh để nghe người hát.');})};return entry;
 }
 async function offer(other){if(peers.has(other)||!stream)return;const {pc}=link(other);stream.getTracks().forEach(t=>pc.addTrack(t,stream));await pc.setLocalDescription(await pc.createOffer());send({type:'signal',to:other,signal:{desc:pc.localDescription}})}
 async function signal(m){const s=m.signal;if(!s||(!stream&&m.from!==song?.owner))return;
  const e=link(m.from);if(s.desc){await e.pc.setRemoteDescription(s.desc);for(const c of e.pending.splice(0))await e.pc.addIceCandidate(c);if(s.desc.type==='offer'){await e.pc.setLocalDescription(await e.pc.createAnswer());send({type:'signal',to:m.from,signal:{desc:e.pc.localDescription}})}}else if(s.candidate){if(e.pc.remoteDescription)await e.pc.addIceCandidate(s.candidate);else e.pending.push(s.candidate)}}
 const elapsed=()=>Math.max(0,(Date.now()+offset-song.start)/1000);
-function sync(){if(!ready)return;if(!song){player.stopVideo();lastSong='';return}if(lastSong!==song.key){lastSong=song.key;player.loadVideoById({videoId:song.video,startSeconds:elapsed()})}else if(player.getPlayerState()===1&&Math.abs(player.getCurrentTime()-elapsed())>2)player.seekTo(elapsed(),true)}
-window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:1,origin:location.origin},events:{onReady:()=>{ready=true;sync()},onStateChange:e=>{if(e.data===0&&song?.owner===id&&player.getVideoData().video_id===song.video)send({type:'next',key:song.key})},onAutoplayBlocked:()=>notice('Nhấn Bật âm thanh để bắt đầu nghe.'),onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')}})};
-const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe_api';yt.onerror=()=>notice('Chưa kết nối được YouTube. Kiểm tra mạng để phát bài hát.');setInterval(()=>{if(song)sync()},4000);
+function checkPlayback(){if(ready&&song)playback.check({song,id,player,elapsed:elapsed()});}
+function sync(){
+ if(!ready)return;
+ if(!song){player.stopVideo();lastSong='';return;}
+ if(lastSong!==song.key){lastSong=song.key;player.loadVideoById({videoId:song.video,startSeconds:elapsed()});output.apply();return;}
+ checkPlayback();
+ if(player.getPlayerState()===1&&Math.abs(player.getCurrentTime()-elapsed())>2)player.seekTo(elapsed(),true);
+}
+window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:1,origin:location.origin},events:{
+ onReady:()=>{ready=true;output.apply();sync();},
+ onStateChange:()=>checkPlayback(),
+ onAutoplayBlocked:()=>{output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
+ onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')
+}})};
+const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe_api';yt.onerror=()=>notice('Chưa kết nối được YouTube. Kiểm tra mạng để phát bài hát.');setInterval(()=>{if(song)sync()},1000);
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
  const old=song;song=m.song;users=m.users;if(song&&!yt.isConnected)document.head.append(yt);offset=m.now-Date.now();
@@ -72,7 +90,7 @@ $('#form').onsubmit=e=>{e.preventDefault();if(!connected)return notice('Đang ch
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=async()=>{if(stream){stopMic();send({type:'mic',on:false});return}const current=song?.key;
  try{if(!navigator.mediaDevices)return notice('Mic cần HTTPS hoặc localhost.');const audio=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});if(song?.key!==current||!connected){audio.getTracks().forEach(t=>t.stop());return}stream=audio;send({type:'mic',on:true})}catch{notice('Chưa mở được mic. Kiểm tra quyền mic của trình duyệt.')}};
-const sound=document.createElement('button');sound.textContent='Bật âm thanh';$('#mic').after(sound);sound.onclick=()=>{if(ready&&song){player.seekTo(elapsed(),true);player.unMute();player.playVideo()}for(const e of peers.values())e.audio?.play().catch(()=>{});notice('')};
+
 $('#invite').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',room);if(['localhost','127.0.0.1'].includes(u.hostname)){notice('Để mời bạn bè, mở phòng qua địa chỉ HTTPS dùng chung rồi sao chép liên kết.');return}try{await navigator.clipboard.writeText(u.href);notice('Đã sao chép liên kết phòng.')}catch{notice(u.href)}};
 connect();
 

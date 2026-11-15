@@ -54,9 +54,16 @@ export function createScenery(scene,box,mat){
  a.textAlign='center';a.fillStyle='#f3d99f';a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
  const poster=new T.MeshBasicMaterial({map:art()}),hole=new T.MeshBasicMaterial({color:0,opacity:0,blending:T.NoBlending,side:T.FrontSide});
  function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
- const rear=screen(0,3.88,-7.45,8.75,3.7,0),front=screen(1.72,1.85,-2.85,1.78,.67,Math.PI+.3);
- // Raise the singer's monitor above the stage lip; a slim stand meets its frame.
- box(1.72,1.22,-2.85,.08,.46,.08,gold);
+ const rear=screen(0,3.88,-7.45,8.75,3.7,0);
+ // A microphone on a stand in front of the singer, visible to the audience.
+ const microphone=new T.Group();microphone.name='StageMicrophone';microphone.position.set(0,1.02,-3.3);scene.add(microphone);
+ function micPart(geometry,color,x,y,z){const mesh=new T.Mesh(geometry,mat(color));mesh.position.set(x,y,z);microphone.add(mesh);return mesh;}
+ micPart(new T.CylinderGeometry(.27,.29,.045,24),'#25252c',0,.025,0);
+ micPart(new T.CylinderGeometry(.018,.023,1.24,10),'#45454e',0,.66,0);
+ const boom=new T.Vector3(0,.25,-.35),rod=micPart(new T.CylinderGeometry(.012,.012,boom.length(),8),'#45454e',0,1.355,-.175);
+ rod.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),boom.normalize());
+ const handle=micPart(new T.CylinderGeometry(.033,.029,.16,12),'#1f2026',0,1.48,-.39);handle.rotation.x=Math.PI/2;
+ micPart(new T.SphereGeometry(.055,16,10),'#b2b4bd',0,1.48,-.50);
  const chairs=addRecliners(scene,seats);
  // One original mural on the rear wall only; the entrance overlays its quiet center.
  const wallMaterial=new T.MeshBasicMaterial({color:'#17151e'});
@@ -83,5 +90,5 @@ export function createScenery(scene,box,mat){
  spot.castShadow=true;spot.shadow.bias=-.0003;spot.shadow.normalBias=.018;scene.add(spot,spot.target);
  const fixture=new T.Mesh(new T.CylinderGeometry(.19,.24,.56,12),mat('#33313c'));fixture.position.copy(spot.position);scene.add(fixture);
  const shaft=new T.Mesh(new T.ConeGeometry(1,1,36,1,true),new T.MeshBasicMaterial({color:0xffdaaf,transparent:true,opacity:.035,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending}));scene.add(shaft);
- return {rear,front,poster,hole,spot,shaft,fixture,chairs};
+ return {rear,poster,hole,spot,shaft,fixture,chairs,microphone};
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {createScenery,batchStaticBoxes} from '../public/scenery.js';
 
-test('static hall batches cut draw objects while retaining bounds and the raised monitor',t=>{
+test('static hall batches retain bounds, audience screen and the stage microphone',t=>{
  const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});
  globalThis.document={createElement(){return {width:1,height:1,getContext(){return new Proxy({createLinearGradient:()=>({addColorStop(){}})},{get:(target,key)=>target[key]??(()=>{})});}};}};
  const scene=new T.Scene(),cube=new T.BoxGeometry(),materials=new Map();
@@ -17,5 +17,6 @@ test('static hall batches cut draw objects while retaining bounds and the raised
  assert.ok(result.boxes>300);
  assert.ok(drawObjects<result.boxes*.1,'static boxes should need at least 90% fewer draw objects');
  assert.ok(before.min.distanceTo(after.min)<.0001&&before.max.distanceTo(after.max)<.0001);
- assert.equal(hall.front.y,1.85);assert.equal(hall.front.mesh.parent.parent,scene);
+ assert.equal(hall.front,undefined,'physical singer monitor is removed');
+ assert.equal(hall.rear.mesh.parent.parent,scene);assert.equal(hall.microphone.name,'StageMicrophone');
 });

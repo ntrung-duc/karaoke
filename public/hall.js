@@ -19,7 +19,7 @@ export function buildHall(view,send,me){
  const cube=new T.BoxGeometry(),materials=new Map(),palette=['#1684bd','#238ab8','#207eb2','#348ec2','#227aa8','#2888b8'];
  function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.79}));return materials.get(c)}
  function box(x,y,z,w,h,d,c,parent=scene){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
- const {rear,front,poster,hole,spot,shaft,fixture,chairs}=createScenery(scene,box,mat);
+ const {rear,poster,hole,spot,shaft,fixture,chairs}=createScenery(scene,box,mat);
  batchStaticBoxes(scene,cube);
  const axis=new T.Vector3(0,1,0),ray=new T.Vector3(),aim=new T.Vector3();
  function focusStage(dt){
@@ -43,7 +43,7 @@ export function buildHall(view,send,me){
  function actor(u){
  const avatar=createAvatar(palette[u.color],mat);scene.add(avatar.body);return avatar;
  }
- const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:auto';const target=document.createElement('div');target.id='player';host.append(target);const display=new CSS3DObject(host);overlay.add(display);
+ const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:auto';const target=document.createElement('div');target.id='player';host.append(target);const display=new CSS3DObject(host);overlay.add(display);const privateOffset=new T.Vector3();
  function pose(u){let a=actors.get(u.id);if(!a){a=actor(u);actors.set(u.id,a)}
  if(!a.user)a.body.position.set(u.x,0,u.z);a.user={...u};}
  function animateActors(dt){for(const [id,a] of actors){
@@ -135,7 +135,15 @@ export function buildHall(view,send,me){
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
- animateActors(dt);focusStage(dt);const monitor=cameraControls.mode!=='overview'&&me()&&api.owner===me()?front:rear;rear.mesh.material=active&&monitor===rear?hole:poster;front.mesh.material=active&&monitor===front?hole:poster;display.visible=active;display.position.set(monitor.x,monitor.y,monitor.z+.015*Math.cos(monitor.rot));display.rotation.y=monitor.rot;display.scale.set(monitor.w/800,monitor.h/450,1);web.render(scene,camera);if(active)css.render(overlay,camera);
+ animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active;
+ host.setAttribute('aria-label',privateScreen?'Màn hình riêng của người hát':'Màn hình phòng hát');
+ host.style.outline=privateScreen?'5px solid #bda2f0':'none';
+ if(privateScreen){
+  const distance=1.5,height=2*distance*Math.tan(camera.fov*Math.PI/360),width=height*camera.aspect,w=Math.min(width*.46,1),h=w*450/800;
+  privateOffset.set(-width/2+w/2+width*.03,-height/2+h/2+height*.09,-distance).applyQuaternion(camera.quaternion);
+  display.position.copy(camera.position).add(privateOffset);display.quaternion.copy(camera.quaternion);display.scale.set(w/800,h/450,1);
+ }else{display.position.set(rear.x,rear.y,rear.z+.015);display.rotation.set(0,rear.rot,0);display.scale.set(rear.w/800,rear.h/450,1);}
+ web.render(scene,camera);if(active)css.render(overlay,camera);
  if(motionDebug){
   const data=web.domElement.dataset;data.playerX=String(self?.x);data.playerZ=String(self?.z);data.pixelRatio=String(pixelRatio);data.bodyYaw=String(actors.get(me())?.body.rotation.y);
   if(pendingInput){data.inputFrameMs=(performance.now()-pendingInput).toFixed(1);pendingInput=0;}

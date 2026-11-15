@@ -16,7 +16,7 @@ export const stateEvent=(room,now)=>({message:snapshot(room,now)});
 
 function advance(room,now){
  const previous=room.users.get(room.song?.owner)?.data;
- if(previous)Object.assign(previous,{x:0,z:-1,seat:-1,mic:false,yaw:0,bodyYaw:0,pitch:0,...resetMotion});
+ if(previous)Object.assign(previous,{x:-5.9,z:-.95,seat:-1,mic:false,yaw:0,bodyYaw:0,pitch:0,...resetMotion});
  room.song=room.queue.shift()||null;
  if(room.song){
   room.song.start=now+1200;
@@ -31,6 +31,12 @@ export function expireMembers(room,now){
  const expired=[...room.users].filter(([,u])=>u.expiresAt<=now).map(([id])=>id);
  for(const id of expired)removeMember(room,id,now);
  return expired.length>0;
+}
+export function finishSong(room,key,now){
+ const expired=expireMembers(room,now);
+ const due=room.song?.key===key&&Number.isFinite(room.song.endAt)&&room.song.endAt<=now;
+ if(due)advance(room,now);
+ return {events:expired||due?[stateEvent(room,now)]:[]};
 }
 export function joinMember(room,{id,connectionId,token,resumeToken},now){
  expireMembers(room,now);
@@ -98,6 +104,10 @@ export function applyMessage(room,id,connectionId,message,now){
   case 'next':
    if(!singer||message.key!==room.song.key)return {events};
    advance(room,now);break;
+  case 'duration':
+   if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};
+   if(room.song.duration===message.duration)return {events};
+   room.song.duration=message.duration;room.song.endAt=room.song.start+message.duration*1000;break;
   case 'mic':if(!singer)return {events};data.mic=!!message.on;break;
   case 'leave':removeMember(room,id,now);break;
   default:return {events};

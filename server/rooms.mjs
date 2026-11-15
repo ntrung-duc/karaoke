@@ -1,13 +1,28 @@
 import {WebSocket} from 'ws';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
-import {joinMember,applyMessage,disconnectMember,snapshot,RESUME_GRACE_MS} from './room-state.mjs';
+import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,RESUME_GRACE_MS} from './room-state.mjs';
 
 // Only socket ownership is local. Room membership, queues, poses and resume
 // tokens live in the store, and committed events reach every subscribed instance.
 export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
  store??=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):createMemoryStore();
  const clients=new Set(),channels=new Map();let stopping=false;
+ function scheduleEnd(record,song){
+  const channel=record.channel;if(!channel)return;
+  const version=song&&Number.isFinite(song.endAt)?song.key+':'+song.endAt:null;
+  if(channel.endVersion===version)return;
+  channel.endVersion=version;clearTimeout(channel.endTimer);
+  if(!version)return;
+  const expire=()=>{
+   if(stopping||!channel.clients.size||channel.endVersion!==version)return;
+   if(song.endAt>now()){channel.endTimer=setTimeout(expire,Math.ceil(song.endAt-now())+5);channel.endTimer.unref?.();return;}
+   store.transact(record.key,room=>finishSong(room,song.key,now())).catch(()=>{
+    if(channel.endVersion===version){channel.endTimer=setTimeout(expire,1000);channel.endTimer.unref?.();}
+   });
+  };
+  channel.endTimer=setTimeout(expire,Math.max(10,song.endAt-now()));channel.endTimer.unref?.();
+ }
  function send(record,message){
   if(record.client.readyState!==WebSocket.OPEN)return;
   if(record.client.bufferedAmount>262144){record.client.close(1013,'Slow connection');return;}
@@ -26,6 +41,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
    if(message.revision<record.revision)return;
    record.revision=message.revision;
   }
+  if(message.type==='state')scheduleEnd(record,message.song);
   send(record,message);
  }
  async function subscribe(record){
@@ -41,6 +57,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
   const channel=record.channel;if(!channel)return;
   channel.clients.delete(record);
   if(channel.clients.size===0&&channels.get(record.key)===channel){
+   clearTimeout(channel.endTimer);
    channel.closing=(async()=>{
     const unsubscribe=await channel.ready;await unsubscribe();
    })().finally(()=>{if(channels.get(record.key)===channel)channels.delete(record.key);});
@@ -112,7 +129,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,resumeGrace
    stopping=true;stopUnavailable();
    const current=[...clients];for(const r of current){clearInterval(r.heartbeat);clearTimeout(r.rotation);r.client.terminate();}
    await Promise.all(current.map(r=>r.pending));
-   for(const channel of channels.values())await channel.ready.then(stop=>stop()).catch(()=>{});
+   for(const channel of channels.values()){clearTimeout(channel.endTimer);await channel.ready.then(stop=>stop()).catch(()=>{});}
    channels.clear();await store.close();
   },
  };
