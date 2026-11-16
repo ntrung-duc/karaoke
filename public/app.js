@@ -9,7 +9,6 @@ import {createServerClock} from './server-clock.js';
 import {createChat} from './chat.js';
 import {createSongSearch} from './youtube-search.js';
 import {EMOTES,emoteName} from './emotes.js';
-import {createMicTestPanel} from './mic-test-panel.js';
 import {createSingerMic} from './singer-mic.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 for(const select of [$('#emote-choice'),$('#room-emote-choice')]){for(const emote of EMOTES){const option=document.createElement('option');option.value=emote.id;option.textContent=emote.name;select.append(option);}select.value='wolf';}
@@ -23,7 +22,7 @@ function microphoneIcon(on){
  if(!on){const slash=document.createElementNS(ns,'path');slash.setAttribute('d','M3 3L21 21');slash.setAttribute('stroke','#ff4f63');slash.setAttribute('stroke-width','3');svg.append(slash);}return svg;
 }
 function emoteControl(user){const active=!!user?.emoteAt&&emoteName(user.emote)===emoteName($('#emote-choice').value);controlIcon($('#emote'),active?'Dừng nhảy':'Emote',active?'■':'💃');$('#emote').setAttribute('aria-pressed',String(active));}
-controlIcon($('#singer-test-mic'),'Test mic','🎚');controlIcon($('#next'),'Bỏ qua bài','⏭');controlIcon($('#pause'),'Bắt đầu hát','▶');emoteControl();
+controlIcon($('#next'),'Bỏ qua bài','⏭');controlIcon($('#pause'),'Bắt đầu hát','▶');emoteControl();
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,connected=false;
 let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
 let chosenSkin=skinIndex(Number(localStorage.getItem('rap-skin')||0));
@@ -44,10 +43,10 @@ const voiceRetries=new Map(),retiredVoices=new Set(),candidateBacklog=new Map(),
 const peers=new Map(),notice=(text,duration=0)=>{clearTimeout(noticeTimer);$('#notice').textContent=text;if(duration>0)noticeTimer=setTimeout(()=>{if($('#notice').textContent===text)$('#notice').textContent='';},duration);};
 let micOpening=false;
 const mobileMic=()=>navigator.maxTouchPoints>0&&(matchMedia('(pointer:coarse)').matches||matchMedia('(max-width:800px)').matches);
-const micTest=createMicTestPanel({root:$('#mic-test-panel'),toggle:$('#test-mic'),canTest:()=>!stream&&!micOpening});
-function updateMicControls(){for(const button of [$('#mic'),$('#singer-mic')]){button.disabled=!connected||song?.owner!==id||micOpening;controlIcon(button,micOpening?'Đang bật mic…':stream?'Tắt mic':'Bật mic',microphoneIcon(!!stream));button.setAttribute('aria-pressed',String(!!stream));}$('#singer-mic').hidden=!mobileMic();}
+function updateMicControls(){for(const button of [$('#mic'),$('#singer-mic')]){button.disabled=!connected||song?.owner!==id||micOpening;controlIcon(button,micOpening?'Đang bật mic…':stream?'Tắt mic':'Bật mic',microphoneIcon(!!stream));button.setAttribute('aria-pressed',String(!!stream));}$('#singer-mic').hidden=!mobileMic();$('#mic-level-panel').hidden=song?.owner!==id;$('#mic-level-status').textContent=micOpening?'Đang mở micro…':stream?'Hãy nói hoặc hát để xem mức âm lượng.':song?.owner===id?'Mic đang tắt.':'Mic sẽ bật khi đến lượt hát.';}
 function readReverb(){try{const saved=localStorage.getItem('rap-reverb'),value=Number(saved);return saved!==null&&Number.isFinite(value)?Math.max(0,Math.min(100,value)):20;}catch{return 20;}}
-const singerMic=createSingerMic({reverb:readReverb()/100,getSession:()=>({key:song?.key,allowed:connected&&song?.owner===id,mobile:mobileMic()}),beforeStart:()=>micTest.close(),onState:state=>{stream=state.stream;micOpening=state.pending;updateMicControls();},onLive:()=>{send({type:'mic',on:true});if(!mobileMic())notice('Mic đã bật cho lượt hát của bạn.',3000);},onStop:()=>{for(const entry of peers.values())closePeer(entry);peers.clear();},onLost:()=>{send({type:'mic',on:false});notice('Mic đã ngắt. Bấm Bật mic để kết nối lại.');},onError:()=>notice('Chưa bật được mic. Cho phép micro rồi bấm Bật mic trên thanh điều khiển hoặc trong Phòng hát.')});
+const singerMic=createSingerMic({reverb:readReverb()/100,getSession:()=>({key:song?.key,allowed:connected&&song?.owner===id,mobile:mobileMic()}),onState:state=>{stream=state.stream;micOpening=state.pending;updateMicControls();},onLive:()=>{send({type:'mic',on:true});if(!mobileMic())notice('Mic đã bật cho lượt hát của bạn.',3000);},onStop:()=>{for(const entry of peers.values())closePeer(entry);peers.clear();},onLost:()=>{send({type:'mic',on:false});notice('Mic đã ngắt. Bấm Bật mic để kết nối lại.');},onError:()=>notice('Chưa bật được mic. Cho phép micro rồi bấm Bật mic trên thanh điều khiển hoặc trong Phòng hát.')});
+setInterval(()=>{const level=stream?singerMic.level():0;$('#mic-level').value=level;$('#mic-level-value').textContent=Math.round(level*100)+'%';},100);
 const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label,musicVolume,voiceVolume})=>{for(const [kind,value] of [['music',musicVolume],['voice',voiceVolume]]){$('#'+kind+'-volume').value=value;$('#'+kind+'-volume-value').textContent=value+'%';}sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 const serverClock=createServerClock({send});
@@ -174,7 +173,7 @@ function render(m){
  hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song);const me=users.find(u=>u.id===id);
  facePicker.select(me?.face??chosenFace);
  skinPicker.value=skinIndex(me?.skin??chosenSkin);
- emoteControl(me);$('#emote').setAttribute('aria-pressed',String(!!me?.emoteAt));$('#emote').disabled=!connected;$('#singer-controls').hidden=!mine;$('#listener-voice-volume').hidden=mine;$('#singer-reverb').hidden=!mine;$('#throw-flower').hidden=!song||mine;$('#throw-flower').disabled=!connected;controlIcon($('#pause'),song?.awaitingStart?'Bắt đầu hát':Number.isFinite(song?.pausedAt)?'Tiếp tục':'Tạm dừng',Number.isFinite(song?.pausedAt)?'▶':'⏸');$('#singer-test-mic').hidden=!song?.awaitingStart;$('#emote').disabled=$('#pause').disabled=$('#next').disabled=!connected;updateMicControls();$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length;$('#people').replaceChildren();$('#songs').replaceChildren();
+ emoteControl(me);$('#emote').setAttribute('aria-pressed',String(!!me?.emoteAt));$('#emote').disabled=!connected;$('#singer-controls').hidden=!mine;$('#listener-voice-volume').hidden=mine;$('#singer-reverb').hidden=!mine;$('#throw-flower').hidden=!song||mine;$('#throw-flower').disabled=!connected;controlIcon($('#pause'),song?.awaitingStart?'Bắt đầu hát':Number.isFinite(song?.pausedAt)?'Tiếp tục':'Tạm dừng',Number.isFinite(song?.pausedAt)?'▶':'⏸');$('#emote').disabled=$('#pause').disabled=$('#next').disabled=!connected;updateMicControls();$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length;$('#people').replaceChildren();$('#songs').replaceChildren();
  for(const u of users)row($('#people'),(u.mic?'🎙 ':'●　')+u.name+(u.id===id?' (bạn)':'')+(u.id===song?.owner?' · Trên sân khấu':u.seat>=0?' · Ghế '+(u.seat+1):' · Đang đứng'));
  const ownerName=s=>users.find(u=>u.id===s.owner)?.name||'Khách';
  if(song)row($('#songs'),'♫　'+song.title+' · '+ownerName(song));else row($('#songs'),'Sân khấu đang trống.',true);
@@ -209,14 +208,12 @@ $('#pause').onclick=()=>{
  if(song?.owner!==id)return;
  const paused=Number.isFinite(song.pausedAt);
  if(paused){
-  micTest.close();
   // Start the iframe directly inside the singer's click. Waiting for the
   // server state round trip loses the browser's user-activation permission.
   if(ready&&player){player.seekTo(song.awaitingStart?0:elapsed(),true);player.playVideo();}
  }else player?.pauseVideo();
  send({type:'playback',key:song.key,paused:!paused});
 };
-$('#singer-test-mic').onclick=()=>{showPanel('room');if($('#mic-test-panel').hidden)$('#test-mic').click();};
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=()=>{if(stream){stopMic();send({type:'mic',on:false});}else singerMic.start();};
 $('#singer-mic').onclick=()=>$('#mic').click();
@@ -231,7 +228,6 @@ const drawer=$('#drawer');
 const switches=document.querySelectorAll('[data-panel]');
 let selectedPanel=null;
 function showPanel(name){
- if(name!=='room')micTest.close();
  const previous=selectedPanel;
  selectedPanel=name;
  drawer.hidden=!name;

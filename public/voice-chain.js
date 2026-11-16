@@ -21,6 +21,9 @@ export function createVoiceChain(raw,{reverb=0.2,AudioContextClass=globalThis.Au
  try{
   context=new AudioContextClass({latencyHint:'interactive'});
   const source=context.createMediaStreamSource(raw);
+  const analyser=context.createAnalyser();analyser.fftSize=1024;
+  const samples=new Uint8Array(analyser.fftSize);source.connect(analyser);
+  const level=()=>{analyser.getByteTimeDomainData(samples);let sum=0;for(const value of samples)sum+=((value-128)/128)**2;return Math.min(1,Math.sqrt(sum/samples.length)*4);};
   const highpass=context.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=80;
   const compressor=context.createDynamicsCompressor();
   compressor.threshold.value=-24;compressor.knee.value=20;compressor.ratio.value=3;compressor.attack.value=0.005;compressor.release.value=0.15;
@@ -40,6 +43,7 @@ export function createVoiceChain(raw,{reverb=0.2,AudioContextClass=globalThis.Au
   return {
    stream:destination.stream,
    ready,
+   level,
    setReverb:set,
    close(){if(closed)return;closed=true;try{source.disconnect();}catch{}context.close().catch(()=>{});},
   };

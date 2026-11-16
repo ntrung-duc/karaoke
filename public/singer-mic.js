@@ -35,5 +35,5 @@ export function createSingerMic({getSession,getUserMedia=()=>navigator.mediaDevi
   }catch(error){if(own===generation&&getSession().key===session.key&&getSession().allowed)onError(error);}
   finally{if(own===generation){pending=false;if(!stream)sessionMode(false);publish();}}
  }
- return {start,stop,setReverb(value){wet=Math.max(0,Math.min(1,Number(value)||0));try{voice?.setReverb(wet);}catch{}},auto(){const session=getSession();if(session.allowed&&session.key&&session.key!==autoKey){autoKey=session.key;if(stream){onLive();return;}return start();}}};
+ return {start,stop,level(){try{return voice?.level?.()||0;}catch{return 0;}},setReverb(value){wet=Math.max(0,Math.min(1,Number(value)||0));try{voice?.setReverb(wet);}catch{}},auto(){const session=getSession();if(session.allowed&&session.key&&session.key!==autoKey){autoKey=session.key;if(stream){onLive();return;}return start();}}};
 }
