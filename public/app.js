@@ -39,12 +39,13 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
  chosenFace=face;localStorage.setItem('rap-face',String(face));hall?.appearance(face);send({type:'appearance',face});
 });
 facePicker.select(chosenFace);
-const peers=new Map(),notice=t=>$('#notice').textContent=t;
+let noticeTimer;
+const peers=new Map(),notice=(text,duration=0)=>{clearTimeout(noticeTimer);$('#notice').textContent=text;if(duration>0)noticeTimer=setTimeout(()=>{if($('#notice').textContent===text)$('#notice').textContent='';},duration);};
 let micOpening=false;
 const mobileMic=()=>navigator.maxTouchPoints>0&&(matchMedia('(pointer:coarse)').matches||matchMedia('(max-width:800px)').matches);
 const micTest=createMicTestPanel({root:$('#mic-test-panel'),toggle:$('#test-mic'),canTest:()=>!stream&&!micOpening});
 function updateMicControls(){for(const button of [$('#mic'),$('#singer-mic')]){button.disabled=!connected||song?.owner!==id||micOpening;controlIcon(button,micOpening?'Đang bật mic…':stream?'Tắt mic':'Bật mic',microphoneIcon(!!stream));button.setAttribute('aria-pressed',String(!!stream));}$('#singer-mic').hidden=!mobileMic();}
-const singerMic=createSingerMic({getSession:()=>({key:song?.key,allowed:connected&&song?.owner===id,mobile:mobileMic()}),beforeStart:()=>micTest.close(),onState:state=>{stream=state.stream;micOpening=state.pending;updateMicControls();},onLive:()=>{send({type:'mic',on:true});if(!mobileMic())notice('Mic đã bật cho lượt hát của bạn.');},onStop:()=>{for(const entry of peers.values())entry.pc.close();peers.clear();},onLost:()=>{send({type:'mic',on:false});notice('Mic đã ngắt. Bấm Bật mic để kết nối lại.');},onError:()=>notice('Chưa bật được mic. Cho phép micro rồi bấm Bật mic trên thanh điều khiển hoặc trong Phòng hát.')});
+const singerMic=createSingerMic({getSession:()=>({key:song?.key,allowed:connected&&song?.owner===id,mobile:mobileMic()}),beforeStart:()=>micTest.close(),onState:state=>{stream=state.stream;micOpening=state.pending;updateMicControls();},onLive:()=>{send({type:'mic',on:true});if(!mobileMic())notice('Mic đã bật cho lượt hát của bạn.',3000);},onStop:()=>{for(const entry of peers.values())entry.pc.close();peers.clear();},onLost:()=>{send({type:'mic',on:false});notice('Mic đã ngắt. Bấm Bật mic để kết nối lại.');},onError:()=>notice('Chưa bật được mic. Cho phép micro rồi bấm Bật mic trên thanh điều khiển hoặc trong Phòng hát.')});
 const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label,musicVolume,voiceVolume})=>{for(const [kind,value] of [['music',musicVolume],['voice',voiceVolume]]){$('#'+kind+'-volume').value=value;$('#'+kind+'-volume-value').textContent=value+'%';}sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 const serverClock=createServerClock({send});
