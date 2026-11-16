@@ -2,7 +2,7 @@ export const songElapsed=(song,now)=>Math.max(0,((Number.isFinite(song.pausedAt)
 
 export function createVoiceDelay(storage){
  const parse=(value,fallback)=>value===null||value===undefined||String(value).trim()===''||!Number.isFinite(Number(value))?fallback:Math.round(Math.max(0,Math.min(2000,Number(value)))/50)*50;
- let value=300;try{value=parse(storage?.getItem('rap-voice-delay'),300);}catch{}
+ let value=650;try{value=parse(storage?.getItem('rap-voice-delay'),650);}catch{}
  return {get value(){return value;},set(next){value=parse(next,value);try{storage?.setItem('rap-voice-delay',String(value));}catch{}return value;}};
 }
 

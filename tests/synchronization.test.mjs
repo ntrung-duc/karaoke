@@ -34,11 +34,11 @@ test('audience video trails the singer for microphone latency; setting changes a
  fresh.calls.length=0;fresh.set(5,0);start.sync({song,id:'viewer',player:fresh.player,now:1000,delayMs:300});assert.deepEqual(fresh.calls,[['seek',.7],['play']]);
 });
 
-test('microphone delay defaults to 300ms, persists locally, supports zero and bounds invalid values',()=>{
+test('microphone delay defaults to 650ms, persists locally, supports zero and bounds invalid values',()=>{
  const saved=new Map(),storage={getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},delay=createVoiceDelay(storage);
- assert.equal(delay.value,300);assert.equal(delay.set(550),550);assert.equal(createVoiceDelay(storage).value,550);
+ assert.equal(delay.value,650);assert.equal(delay.set(550),550);assert.equal(createVoiceDelay(storage).value,550);
  assert.equal(delay.set(9999),2000);assert.equal(delay.set(0),0);assert.equal(createVoiceDelay(storage).value,0);
- assert.equal(delay.set('invalid'),0);assert.equal(createVoiceDelay({getItem(){throw Error('blocked');}}).value,300);
+ assert.equal(delay.set('invalid'),0);assert.equal(createVoiceDelay({getItem(){throw Error('blocked');}}).value,650);
 });
 
 test('playing audience videos never seek or pause on jitter, periodic reports or singer buffering',()=>{
