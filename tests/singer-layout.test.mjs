@@ -16,6 +16,8 @@ test('lyric screen is centered above chat and clear of singer controls and joyst
   assert.ok(r.x>=joystick.right+12-.001||r.y+r.height<=joystick.top-12+.001,'screen avoids the joystick');
  }
  assert.ok(singerScreenRect(1280,560).width>=450,'landscape screen is larger than the old corner preview');
+ const mobile=singerScreenRect(390,844,{chatTop:791,controlsBottom:105,joystick:{left:12,right:116,top:678}});
+ assert.equal(mobile.y+mobile.height,646,'mobile screen is lifted 20px farther above the joystick');
 });
 
 test('desktop lyric screen is enlarged at bottom left, clear of the chat',()=>{
