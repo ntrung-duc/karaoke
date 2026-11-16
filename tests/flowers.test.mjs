@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {emptyRoom,joinMember,applyMessage,encodeRoom,decodeRoom} from '../server/room-state.mjs';
+import {seats,floorHeight} from '../public/layout.js';
 
 function fixture(){
  const room=emptyRoom();
@@ -28,4 +29,11 @@ test('singers, stale turns, expired members and impersonated sessions cannot thr
  assert.equal(applyMessage(room,'viewer','wrong',{type:'flower',key},2000).expired,true);
  assert.equal(send('viewer',{type:'flower',key},100000).expired,true);
  room.song=null;assert.equal(send('singer',{type:'flower',key},2001).events.length,0);
+});
+test('flowers launch above elevated seats and the raised walking floor',()=>{
+ const {room,send,key}=fixture(),viewer=room.users.get('viewer').data;
+ Object.assign(viewer,{...seats[19],seat:19});
+ assert.equal(send('viewer',{type:'flower',key}).events[0].message.from.y,seats[19].y+1.45);
+ viewer.seat=-1;viewer.z=15;
+ assert.equal(send('viewer',{type:'flower',key},4000).events[0].message.from.y,floorHeight(15)+1.2);
 });

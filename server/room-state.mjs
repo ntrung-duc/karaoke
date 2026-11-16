@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
-import {seats,position,clearSeat} from '../public/layout.js';
+import {seats,position,clearSeat,floorHeight} from '../public/layout.js';
 import {gaits,jumpPose} from '../public/motion.js';
 import {MAX_QUEUE,MAX_NAME,MAX_TITLE,MAX_CHAT,MAX_CHAT_HISTORY} from '../public/session.js';
 import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-settings.js';
@@ -70,7 +70,7 @@ export function applyMessage(room,id,connectionId,message,now){
    const angle=Math.random()*Math.PI*2,radius=.6+Math.random()*1.1;
    const end=position(singerData.x+Math.cos(angle)*radius,singerData.z+Math.sin(angle)*radius,true);
    events.push({message:{type:'flower',id:randomUUID(),key:room.song.key,at:now,
-    from:{x:data.x,y:data.seat>=0?1.45:1.2,z:data.z},to:{...end,y:1.08},revision:room.revision}});
+    from:{x:data.x,y:(data.seat>=0?(seats[data.seat]?.y??0)+1.45:floorHeight(data.z)+1.2),z:data.z},to:{...end,y:1.08},revision:room.revision}});
    return {events};
   }
   case 'chat':{
