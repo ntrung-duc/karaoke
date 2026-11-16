@@ -57,6 +57,7 @@ const playback=createPlaybackMonitor(send);
 const search=createSongSearch({send,notice});
 const chat=createChat({send,getId:()=>id,isOpen:()=>!$('#chat').hidden,notice});
 output.apply();
+$('#music-volume-help').hidden=!(/iPhone|iPad|iPod/.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 sound.onclick=()=>{output.toggle();notice('');};
 for(const kind of ['music','voice'])$('#'+kind+'-volume').oninput=event=>output.setVolume(kind,event.target.value);
 function send(m){return connection?.send(m)}

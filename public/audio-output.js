@@ -4,8 +4,8 @@ export function createAudioOutput({getPlayer=()=>null,getAudio=()=>[],canPlay=()
  function readVolume(key,fallback){try{return volume(storage?.getItem(key),fallback);}catch{return fallback;}}
  let musicVolume=readVolume('rap-music-volume',30),voiceVolume=readVolume('rap-voice-volume',100);
  function notify(){onChange({muted,musicVolume,voiceVolume,label:muted||blocked?'Bật âm thanh':'Tắt âm thanh'});}
- function attach(audio){audio.muted=muted;audio.volume=voiceVolume/100;}
- function apply(){const player=getPlayer();if(player){player.setVolume?.(musicVolume);if(muted)player.mute();else player.unMute();}for(const audio of getAudio())attach(audio);notify();}
+ function attach(audio){audio.muted=muted||voiceVolume===0;audio.volume=voiceVolume/100;}
+ function apply(){const player=getPlayer();if(player){player.setVolume?.(musicVolume);if(muted||musicVolume===0)player.mute();else player.unMute();}for(const audio of getAudio())attach(audio);notify();}
  function setVolume(kind,value){
   if(kind==='music'){musicVolume=volume(value,musicVolume);try{storage?.setItem('rap-music-volume',String(musicVolume));}catch{}}
   else if(kind==='voice'){voiceVolume=volume(value,voiceVolume);try{storage?.setItem('rap-voice-volume',String(voiceVolume));}catch{}}

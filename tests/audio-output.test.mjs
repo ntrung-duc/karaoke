@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAudioOutput} from '../public/audio-output.js';
 
+test('zero music uses explicit mute even when an iPhone player ignores setVolume; voice remains audible',()=>{
+ let musicMuted=false;const voice={muted:false},player={setVolume(){},mute(){musicMuted=true;},unMute(){musicMuted=false;}};
+ const output=createAudioOutput({getPlayer:()=>player,getAudio:()=>[voice]});
+ output.setVolume('music',0);assert.equal(musicMuted,true);assert.equal(voice.muted,false);assert.equal(output.muted,false);
+ output.apply();assert.equal(musicMuted,true,'new song or playing event cannot unmute zero music');
+ output.setVolume('music',50);assert.equal(musicMuted,false);
+ output.setVolume('voice',0);assert.equal(voice.muted,true);assert.equal(musicMuted,false);
+ output.setVolume('voice',100);assert.equal(voice.muted,false);
+});
+
 test('entering the room enables sound despite an old mute, restores zero levels and respects later manual mute',()=>{
  const saved=new Map([['rap-muted','1'],['rap-music-volume','0'],['rap-voice-volume','0']]);
  let plays=0,paused=true;const audio={play(){plays++;return Promise.resolve();}};
