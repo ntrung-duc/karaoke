@@ -207,12 +207,21 @@ $('#room-emote-choice').onchange=()=>{$('#emote-choice').value=$('#room-emote-ch
 $('#pause').onclick=()=>{
  if(song?.owner!==id)return;
  const paused=Number.isFinite(song.pausedAt);
+ const now=serverClock.now(),previous=song,next={...song};
+ if(paused){
+  if(song.awaitingStart)next.start=now;
+  else next.start=song.start+Math.max(0,now-song.pausedAt);
+  delete next.pausedAt;delete next.awaitingStart;
+  if(next.duration)next.endAt=next.start+next.duration*1000;
+ }else{next.pausedAt=now;delete next.endAt;}
+ song=next;
+ if(!send({type:'playback',key:song.key,paused:!paused})){song=previous;return;}
+ controlIcon($('#pause'),paused?'Tạm dừng':'Tiếp tục',paused?'⏸':'▶');
  if(paused){
   // Start the iframe directly inside the singer's click. Waiting for the
   // server state round trip loses the browser's user-activation permission.
   if(ready&&player){player.seekTo(song.awaitingStart?0:elapsed(),true);player.playVideo();}
  }else player?.pauseVideo();
- send({type:'playback',key:song.key,paused:!paused});
 };
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=()=>{if(stream){stopMic();send({type:'mic',on:false});}else singerMic.start();};
