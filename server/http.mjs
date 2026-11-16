@@ -8,6 +8,7 @@ const files = new Map([
   ['/server-clock.js', 'public/server-clock.js'],
   ['/flowers.js', 'public/flowers.js'],
   ['/singer-mic.js', 'public/singer-mic.js'],
+  ['/voice-chain.js', 'public/voice-chain.js'],
   ['/singer-layout.js', 'public/singer-layout.js'],
   ['/mobile-controls.js', 'public/mobile-controls.js'],
   ['/mic-test.js', 'public/mic-test.js'],
