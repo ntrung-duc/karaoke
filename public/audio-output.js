@@ -22,7 +22,7 @@ export function createAudioOutput({getPlayer=()=>null,getAudio=()=>[],canPlay=()
   for(const audio of getAudio())Promise.resolve(audio.play()).catch(block);
  }
  return {
-  get muted(){return muted;},get musicVolume(){return musicVolume;},get voiceVolume(){return voiceVolume;},apply,block,setVolume,attach,enable,
+  get muted(){return muted;},get blocked(){return blocked;},get musicVolume(){return musicVolume;},get voiceVolume(){return voiceVolume;},apply,block,setVolume,attach,enable,
   toggle(){
    const enable=muted||blocked;muted=!enable;blocked=false;
    try{storage?.setItem('rap-muted',muted?'1':'0');}catch{}
