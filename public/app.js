@@ -4,7 +4,7 @@ import {faceIndex,skinIndex,SKINS,shirtColor} from './avatar-settings.js';
 import {createFacePicker} from './faces.js';
 import {createConnection} from './connection.js';
 import {createAudioOutput} from './audio-output.js';
-import {createPlaybackMonitor,songElapsed,createPlayheadReporter,createVideoSync} from './playback.js';
+import {createPlaybackMonitor,songElapsed,createPlayheadReporter,createVideoSync,createVoiceDelay} from './playback.js';
 import {createServerClock} from './server-clock.js';
 import {createChat} from './chat.js';
 import {createSongSearch} from './youtube-search.js';
@@ -38,7 +38,10 @@ const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label,musicVolume,voiceVolume})=>{for(const [kind,value] of [['music',musicVolume],['voice',voiceVolume]]){$('#'+kind+'-volume').value=value;$('#'+kind+'-volume-value').textContent=value+'%';}sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 const serverClock=createServerClock({send});
 const playhead=createPlayheadReporter(send,()=>serverClock.now());
-const videoSync=createVideoSync();
+const videoSync=createVideoSync(),voiceDelay=createVoiceDelay(localStorage);
+const delayPicker=$('#voice-delay');delayPicker.value=voiceDelay.value;$('#voice-delay-value').textContent=voiceDelay.value+' ms';
+delayPicker.oninput=()=>{$('#voice-delay-value').textContent=delayPicker.value+' ms';};
+delayPicker.onchange=()=>{delayPicker.value=voiceDelay.set(delayPicker.value);$('#voice-delay-value').textContent=voiceDelay.value+' ms';sync();};
 const playback=createPlaybackMonitor(send);
 const search=createSongSearch({send,notice});
 const chat=createChat({send,getId:()=>id,isOpen:()=>!$('#chat').hidden,notice});
@@ -63,7 +66,7 @@ const elapsed=()=>songElapsed(song,serverClock.now());
 function checkPlayback(){if(ready&&song)playback.check({song,id,player,elapsed:elapsed()});}
 function sync(){
  if(!ready)return;
- if(videoSync.sync({song,id,player,now:serverClock.now()})){output.apply();return;}
+ if(videoSync.sync({song,id,player,now:serverClock.now(),delayMs:voiceDelay.value})){output.apply();return;}
  playhead.check({song,id,player});checkPlayback();
 }
 window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:0,disablekb:1,origin:location.origin},events:{

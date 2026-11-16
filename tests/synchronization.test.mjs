@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {WebSocket} from 'ws';
 import {createServerClock} from '../public/server-clock.js';
-import {createVideoSync,createPlayheadReporter,songElapsed} from '../public/playback.js';
+import {createVideoSync,createPlayheadReporter,songElapsed,createVoiceDelay} from '../public/playback.js';
 import {emptyRoom,joinMember,applyMessage,finishSong} from '../server/room-state.mjs';
 import {createApplication} from '../server/application.mjs';
 
@@ -21,6 +21,25 @@ function playerFixture(){
   loadVideoById:v=>calls.push(['load',v]),cueVideoById:v=>calls.push(['cue',v]),stopVideo:()=>calls.push(['stop']),seekTo:v=>calls.push(['seek',v]),pauseVideo:()=>calls.push(['pause']),playVideo:()=>calls.push(['play'])};
  return {calls,player,set(stateValue,positionValue){state=stateValue;position=positionValue;}};
 }
+
+test('audience video trails the singer for microphone latency; setting changes apply without delaying the singer',()=>{
+ let time=0;const f=playerFixture(),sync=createVideoSync(()=>time),song={key:'a',owner:'singer',video:'abcdefghijk',start:0};
+ const run=(id='viewer',delayMs=300,now=10000)=>sync.sync({song,id,player:f.player,now,delayMs});
+ run();assert.equal(f.calls[0][1].startSeconds,9.7);f.calls.length=0;
+ f.set(1,9.7);run();assert.deepEqual(f.calls,[]);
+ run('viewer',500);assert.deepEqual(f.calls,[['seek',9.5]],'small compensation changes are not swallowed by the normal drift threshold');
+ f.calls.length=0;time=3000;run('singer',500);assert.deepEqual(f.calls,[],'singer remains on the original timeline');
+ const fresh=playerFixture(),start=createVideoSync(()=>time);
+ start.sync({song,id:'viewer',player:fresh.player,now:100,delayMs:300});assert.equal(fresh.calls[0][0],'cue');assert.equal(fresh.calls[0][1].startSeconds,0);
+ fresh.calls.length=0;fresh.set(5,0);start.sync({song,id:'viewer',player:fresh.player,now:1000,delayMs:300});assert.deepEqual(fresh.calls,[['seek',.7],['play']]);
+});
+
+test('microphone delay defaults to 300ms, persists locally, supports zero and bounds invalid values',()=>{
+ const saved=new Map(),storage={getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},delay=createVoiceDelay(storage);
+ assert.equal(delay.value,300);assert.equal(delay.set(550),550);assert.equal(createVoiceDelay(storage).value,550);
+ assert.equal(delay.set(9999),2000);assert.equal(delay.set(0),0);assert.equal(createVoiceDelay(storage).value,0);
+ assert.equal(delay.set('invalid'),0);assert.equal(createVoiceDelay({getItem(){throw Error('blocked');}}).value,300);
+});
 
 test('spectators correct subsecond drift with a cooldown and catch up after buffering; singer is never repeatedly sought',()=>{
  let time=0;const f=playerFixture(),sync=createVideoSync(()=>time),song={key:'a',owner:'singer',video:'abcdefghijk',start:0};
