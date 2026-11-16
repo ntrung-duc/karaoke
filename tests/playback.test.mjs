@@ -31,7 +31,7 @@ test('local mute covers the player, existing voice and future voice without stop
  const output=createAudioOutput({getPlayer:()=>player,getAudio:()=>audio,storage});
  output.toggle();assert.equal(output.muted,true);assert.equal(voice.muted,true);assert.deepEqual(calls,['mute']);
  const later={muted:false};output.attach(later);assert.equal(later.muted,true);
- assert.equal(createAudioOutput({storage}).muted,true,'mute persists across reload');
+ assert.equal(createAudioOutput({storage}).muted,false,'new room entry starts with sound enabled');
  output.toggle();assert.equal(voice.muted,false);assert.ok(calls.includes('unmute'));assert.ok(calls.includes('voice-play'));
  output.block();output.toggle();assert.equal(output.muted,false,'autoplay recovery enables sound rather than muting it');
 });

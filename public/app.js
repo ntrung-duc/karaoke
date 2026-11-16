@@ -81,7 +81,7 @@ function sync(){
 }
 window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:0,disablekb:1,origin:location.origin},events:{
  onReady:()=>{ready=true;player.getIframe().tabIndex=-1;output.apply();sync();},
- onStateChange:()=>sync(),
+ onStateChange:event=>{if(event.data===1||event.data===5)output.apply();sync();},
  onAutoplayBlocked:()=>{output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
  onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')
 }})};
@@ -89,7 +89,9 @@ const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
  const old=song;song=m.song;const mine=song?.owner===id;users=m.users;chat.history(m.chat||[]);if(song&&!yt.isConnected)document.head.append(yt);serverClock.observe(m.now);
- if(old?.key!==song?.key||stream&&!mine||!mine&&!users.find(u=>u.id===song?.owner)?.mic)stopMic();
+ const changedTurn=old?.key!==song?.key,keepMic=stream&&mine&&old?.owner===id;
+ if(changedTurn&&keepMic){for(const entry of peers.values())entry.pc.close();peers.clear();}
+ else if(changedTurn||stream&&!mine||!mine&&!users.find(u=>u.id===song?.owner)?.mic)stopMic();
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){e.pc.close();peers.delete(pid)}
  hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song);const me=users.find(u=>u.id===id);
  facePicker.select(me?.face??chosenFace);

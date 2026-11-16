@@ -4,6 +4,22 @@ import {createSingerMic} from '../public/singer-mic.js';
 
 const recording=()=>{const track={stops:0,stop(){this.stops++;},onended:null};return {track,getTracks:()=>[track],getAudioTracks:()=>[track]};};
 
+test('consecutive singer turns reuse capture without switching iPhone audio mode or losing room mic announcement',async()=>{
+ const modes=[],audio=recording();let session={key:'one',allowed:true},calls=0,live=0;
+ const mic=createSingerMic({getSession:()=>session,audioSession:{set type(value){modes.push(value);}},getUserMedia:async()=>{assert.equal(modes.at(-1),'play-and-record');calls++;return audio;},onLive:()=>live++});
+ await mic.auto();session={key:'two',allowed:true};await mic.auto();
+ assert.equal(calls,1);assert.equal(live,2);assert.equal(audio.track.stops,0);assert.deepEqual(modes,['play-and-record']);
+ session.allowed=false;mic.stop();assert.equal(audio.track.stops,1);assert.deepEqual(modes,['play-and-record','playback']);
+ mic.stop();assert.equal(modes.length,2,'listener snapshots do not continually switch audio mode');
+});
+
+test('failed mic permission restores playback mode and unsupported audio session setters do not prevent singing',async()=>{
+ const modes=[];const mic=createSingerMic({getSession:()=>({key:'one',allowed:true}),audioSession:{set type(value){modes.push(value);}},getUserMedia:async()=>{throw Error('denied');}});
+ await mic.auto();assert.deepEqual(modes,['play-and-record','playback']);
+ let live=false;const audio=recording(),fallback=createSingerMic({getSession:()=>({key:'two',allowed:true}),audioSession:{set type(value){throw Error('unsupported');}},getUserMedia:async()=>audio,onLive:()=>live=true});
+ await fallback.auto();assert.equal(live,true);fallback.stop();assert.equal(audio.track.stops,1);
+});
+
 test('desktop and mobile auto open once per singing turn and respect manual mute',async()=>{
  let session={key:'one',allowed:true,mobile:false},calls=0,live=0;const audio=recording();
  const mic=createSingerMic({getSession:()=>session,getUserMedia:async()=>{calls++;return audio;},onLive:()=>live++});
