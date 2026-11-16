@@ -1,8 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSingerMic} from '../public/singer-mic.js';
+import {createSingerMic,createDefaultMicWatcher} from '../public/singer-mic.js';
 
 const recording=()=>{const track={stops:0,stop(){this.stops++;},onended:null};return {track,getTracks:()=>[track],getAudioTracks:()=>[track]};};
+
+test('default input watcher follows headset plug/unplug, ignores output changes and preserves a manual input',()=>{
+ const watcher=createDefaultMicWatcher(),devices=(group,extra=[])=>[{kind:'audioinput',deviceId:'default',groupId:group},...extra];
+ assert.equal(watcher.check(devices('laptop')),false);
+ assert.equal(watcher.check(devices('laptop',[{kind:'audiooutput',deviceId:'speaker'}])),false);
+ assert.equal(watcher.check(devices('headset')),true);
+ assert.equal(watcher.check(devices('laptop')),true);
+ assert.equal(watcher.check(devices('headset',[{kind:'audioinput',deviceId:'usb'}]),'usb'),false);
+ assert.equal(watcher.check(devices('headset'),'usb'),true,'removed manual input falls back to default');
+ const permissions=createDefaultMicWatcher();assert.equal(permissions.check([{kind:'audioinput',deviceId:'default',label:'Default'}]),false);
+ assert.equal(permissions.check(devices('laptop')),false,'permission details alone must not reopen capture');
+});
+
+test('device removal can recover automatic capture, while a manual mute or ended turn cannot',async()=>{
+ let session={key:'one',allowed:true},calls=0,current;
+ const mic=createSingerMic({getSession:()=>session,getUserMedia:async()=>{calls++;return current=recording();}});
+ await mic.auto();current.track.onended();await mic.recover();assert.equal(calls,2);
+ mic.stop();await mic.recover();assert.equal(calls,2,'manual mute stays muted after device events');
+ await mic.start();current.track.onended();session={key:'two',allowed:true};await mic.recover();assert.equal(calls,3,'never recover a previous turn');
+ session={key:'one',allowed:false};await mic.recover();assert.equal(calls,3,'spectators do not capture');
+});
 
 test('consecutive singer turns reuse capture without switching iPhone audio mode or losing room mic announcement',async()=>{
  const modes=[],audio=recording();let session={key:'one',allowed:true},calls=0,live=0;

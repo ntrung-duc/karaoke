@@ -10,7 +10,7 @@ import {createChat} from './chat.js';
 import {createSongSearch} from './youtube-search.js';
 import {EMOTES,emoteName} from './emotes.js';
 import {createMicTestPanel} from './mic-test-panel.js';
-import {createSingerMic} from './singer-mic.js';
+import {createSingerMic,createDefaultMicWatcher} from './singer-mic.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 for(const select of [$('#emote-choice'),$('#room-emote-choice')]){for(const emote of EMOTES){const option=document.createElement('option');option.value=emote.id;option.textContent=emote.name;select.append(option);}select.value='wolf';}
 function controlIcon(button,label,icon){
@@ -43,17 +43,22 @@ const voiceRetries=new Map();
 const peers=new Map(),notice=t=>$('#notice').textContent=t;
 let micOpening=false;
 const mobileMic=()=>navigator.maxTouchPoints>0&&(matchMedia('(pointer:coarse)').matches||matchMedia('(max-width:800px)').matches);
-const micInput=$('#mic-input');
-async function refreshMicInputs(){
+const micInput=$('#mic-input'),defaultMicWatcher=createDefaultMicWatcher();
+async function refreshMicInputs({switchDefault=false}={}){
  try{
   const devices=await navigator.mediaDevices.enumerateDevices(),selected=micInput.value;
-  const options=[new Option('Micro mặc định của máy','')];
+  const changed=defaultMicWatcher.check(devices,selected);
+  const options=[new Option('Tự động — thiết bị mặc định của máy','')];
   for(const device of devices.filter(d=>d.kind==='audioinput'&&d.deviceId))options.push(new Option(device.label||'Micro '+options.length,device.deviceId));
   micInput.replaceChildren(...options);micInput.value=options.some(o=>o.value===selected)?selected:'';
+  if(switchDefault){
+   if(changed&&(stream||micOpening))micInput.onchange();
+   else if(!micInput.value)singerMic.recover();
+  }
  }catch{}
 }
 async function captureMic(constraints){
- const audio=await navigator.mediaDevices.getUserMedia({...constraints,audio:{...constraints.audio,...(micInput.value?{deviceId:{exact:micInput.value}}:{})}});
+ const audio=await navigator.mediaDevices.getUserMedia({...constraints,audio:{...constraints.audio,deviceId:micInput.value?{exact:micInput.value}:{ideal:'default'}}});
  refreshMicInputs();return audio;
 }
 const micTest=createMicTestPanel({root:$('#mic-test-panel'),toggle:$('#test-mic'),canTest:()=>!stream&&!micOpening,
@@ -188,7 +193,7 @@ $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#n
 $('#mic').onclick=()=>{if(stream){stopMic();send({type:'mic',on:false});}else singerMic.start();};
 $('#singer-mic').onclick=()=>$('#mic').click();
 micInput.onchange=()=>{const live=!!stream||micOpening,testing=!$('#mic-test-panel').hidden;micTest.close();if(live){stopMic();send({type:'mic',on:false});singerMic.start();}else if(testing)$('#test-mic').click();};
-navigator.mediaDevices?.addEventListener?.('devicechange',refreshMicInputs);
+navigator.mediaDevices?.addEventListener?.('devicechange',()=>refreshMicInputs({switchDefault:true}));
 
 let flowerAt=-Infinity;
 $('#throw-flower').onclick=()=>{if(!connected||!song||song.owner===id||performance.now()-flowerAt<1200)return;if(send({type:'flower',key:song.key})){flowerAt=performance.now();hall?.focus();}};
@@ -204,7 +209,7 @@ function showPanel(name){
  selectedPanel=name;
  drawer.hidden=!name;
  if(name==='chat')chat.open();
- if(name==='room')refreshMicInputs();
+ if(name==='room')refreshMicInputs({switchDefault:true});
  for(const control of switches){
   const selected=control.dataset.panel===name;
   control.setAttribute('aria-expanded',String(selected));
