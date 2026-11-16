@@ -7,3 +7,11 @@ export function position(x,z,stage) {
 }
 export function clearSeat(x,z){return seats.every(s=>Math.abs(s.x-x)>.64 || Math.abs(s.z-z)>.65)}
 
+
+export function floorHeight(z) {
+  if (z >= 8) return 1.4;
+  if (z >= 6) return 1.05;
+  if (z >= 4) return 0.7;
+  if (z >= 2) return 0.35;
+  return 0;
+}

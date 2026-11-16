@@ -29,7 +29,7 @@ export function batchStaticBoxes(scene,geometry){
 export function createScenery(scene,box,mat){
  const gold='#c39852',wood='#583a2f',dark='#32232a';
  box(0,-.14,4,20,.28,26,'#4b4862');
- for(let r=1;r<=4;r++){box(0,.35*(r-.5),(r*2+10.5)/2,17,.35,10.5-r*2,'#4b4862');}box(0,4,-8,20,8,.3,dark);
+ for(let r=1;r<=4;r++){const stepFront=r*2,stepLen=17-stepFront;box(0,.35*(r-.5),stepFront+stepLen/2,19.2,.35,stepLen,'#4b4862');}box(0,4,-8,20,8,.3,dark);
  for(const x of [-9.65,9.65]){box(x,3,4,.23,6.3,26,'#b49779');box(x,1.65,4,.27,.07,26,gold);
  for(let z=-6;z<=13;z+=3){box(x*.99,2.9,z,.15,5.8,.11,wood);box(x*.98,3.25,z,.22,.62,.26,'#ffce87')}}
  box(0,.48,-5.25,14,.96,5.7,wood);box(0,.95,-5.25,14,.09,5.7,'#bc9875');box(0,.83,-2.38,14,.06,.05,gold);

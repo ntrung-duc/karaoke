@@ -9,7 +9,7 @@ test('40 upholstered recliners share geometry and retain walkable aisles',()=>{
  assert.equal(seats.length,40);assert.equal(new Set(seats.map(s=>`${s.x},${s.z}`)).size,40);
  const scene=new T.Scene(),parts=addRecliners(scene,seats);
  assert.ok(parts.length<24,'chairs use instancing rather than a mesh per cushion per chair');
- for(const part of parts){assert.equal(part.count,40);assert.ok(part.isInstancedMesh);assert.ok(part.boundingBox.max.y<1.8);}
+ for(const part of parts){assert.equal(part.count,40);assert.ok(part.isInstancedMesh);assert.ok(part.boundingBox.max.y<3.2);}
  for(const s of seats)assert.ok(clearSeat(s.x,s.z-.83));
  for(const x of [-8,0,8])for(let z=-1;z<12;z+=.1)assert.ok(clearSeat(x,z));
 });

@@ -1,7 +1,7 @@
 import {createScenery,batchStaticBoxes} from './scenery.js';
 import * as T from 'three';
 import {CSS3DRenderer,CSS3DObject} from '/lib/css.js';
-import {seats,position,clearSeat} from './layout.js';
+import {seats,position,clearSeat,floorHeight} from './layout.js';
 import {createAvatar,loadMotions} from './avatar.js';
 import {jumpPose,displacementGait,WALK_SPEED} from './motion.js';
 import {relativeHeadYaw,faceIndex,skinIndex,shirtColor} from './avatar-settings.js';
@@ -84,7 +84,7 @@ export function buildHall(view,send,me){
  const target=sitting?0:(u.bodyYaw??(singer?Math.PI:0));
  a.facing=id===me()?target:base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
- a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:0)+jump.height;
+ a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z))+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
  a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);
@@ -178,7 +178,8 @@ export function buildHall(view,send,me){
  if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;self.emoteAt=0;}
  const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,false):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
  const eyeHeight=self.seat>=0?1.80:1.61,orbitHeight=1.05;
- camera.position.set(self.x,(api.owner===me()?1:0)+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
+ const baseY=self.seat>=0?(seats[self.seat]?.y||0):(api.owner===me()?1:floorHeight(self.z));
+  camera.position.set(self.x,baseY+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
  if(cameraControls.mode==='avatar'){
   const {yaw,pitch,distance}=cameraControls,horizontal=Math.cos(pitch)*distance;
   camera.rotation.set(pitch,yaw,0,'YXZ');
