@@ -40,12 +40,13 @@ const facePicker=createFacePicker($('#face-picker'),face=>{
 });
 facePicker.select(chosenFace);
 let noticeTimer;
+const voiceRetries=new Map(),retiredVoices=new Set(),candidateBacklog=new Map(),voiceRequestAt=new Map();
 const peers=new Map(),notice=(text,duration=0)=>{clearTimeout(noticeTimer);$('#notice').textContent=text;if(duration>0)noticeTimer=setTimeout(()=>{if($('#notice').textContent===text)$('#notice').textContent='';},duration);};
 let micOpening=false;
 const mobileMic=()=>navigator.maxTouchPoints>0&&(matchMedia('(pointer:coarse)').matches||matchMedia('(max-width:800px)').matches);
 const micTest=createMicTestPanel({root:$('#mic-test-panel'),toggle:$('#test-mic'),canTest:()=>!stream&&!micOpening});
 function updateMicControls(){for(const button of [$('#mic'),$('#singer-mic')]){button.disabled=!connected||song?.owner!==id||micOpening;controlIcon(button,micOpening?'Đang bật mic…':stream?'Tắt mic':'Bật mic',microphoneIcon(!!stream));button.setAttribute('aria-pressed',String(!!stream));}$('#singer-mic').hidden=!mobileMic();}
-const singerMic=createSingerMic({getSession:()=>({key:song?.key,allowed:connected&&song?.owner===id,mobile:mobileMic()}),beforeStart:()=>micTest.close(),onState:state=>{stream=state.stream;micOpening=state.pending;updateMicControls();},onLive:()=>{send({type:'mic',on:true});if(!mobileMic())notice('Mic đã bật cho lượt hát của bạn.',3000);},onStop:()=>{for(const entry of peers.values())entry.pc.close();peers.clear();},onLost:()=>{send({type:'mic',on:false});notice('Mic đã ngắt. Bấm Bật mic để kết nối lại.');},onError:()=>notice('Chưa bật được mic. Cho phép micro rồi bấm Bật mic trên thanh điều khiển hoặc trong Phòng hát.')});
+const singerMic=createSingerMic({getSession:()=>({key:song?.key,allowed:connected&&song?.owner===id,mobile:mobileMic()}),beforeStart:()=>micTest.close(),onState:state=>{stream=state.stream;micOpening=state.pending;updateMicControls();},onLive:()=>{send({type:'mic',on:true});if(!mobileMic())notice('Mic đã bật cho lượt hát của bạn.',3000);},onStop:()=>{for(const entry of peers.values())closePeer(entry);peers.clear();},onLost:()=>{send({type:'mic',on:false});notice('Mic đã ngắt. Bấm Bật mic để kết nối lại.');},onError:()=>notice('Chưa bật được mic. Cho phép micro rồi bấm Bật mic trên thanh điều khiển hoặc trong Phòng hát.')});
 const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label,musicVolume,voiceVolume})=>{for(const [kind,value] of [['music',musicVolume],['voice',voiceVolume]]){$('#'+kind+'-volume').value=value;$('#'+kind+'-volume-value').textContent=value+'%';}sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 const serverClock=createServerClock({send});
@@ -65,15 +66,86 @@ let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){notice('Trình duy�
 function stopMic(){singerMic.stop();}
 window.addEventListener('pagehide',()=>{stopMic();serverClock.stop();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){serverClock.request();sync();}});
-function link(other){
- if(peers.has(other))return peers.get(other);
- const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},...ice]});const entry={pc,pending:[]};peers.set(other,entry);
- pc.onicecandidate=e=>{if(e.candidate)send({type:'signal',to:other,signal:{candidate:e.candidate}})};
- pc.ontrack=e=>{const audio=document.createElement('audio');audio.autoplay=true;audio.srcObject=e.streams[0];entry.audio=audio;output.attach(audio);audio.play().catch(()=>{output.block();if(!output.muted)notice('Chạm Bật âm thanh để nghe người hát.');})};return entry;
+function closePeer(entry){clearTimeout(entry.retryTimer);clearTimeout(entry.requestTimer);if(entry.voiceId)retiredVoices.add(entry.voiceId);while(retiredVoices.size>128)retiredVoices.delete(retiredVoices.values().next().value);if(entry.audio){entry.audio.pause();entry.audio.srcObject=null;entry.audio.remove();}entry.pc.close();}
+function requestVoice(other,force=false){
+ if(!connected||!song||song.owner===id||!other||!users.some(u=>u.id===other&&u.mic))return false;
+ const entry=peers.get(other);if(!force&&entry&&!['failed','closed'].includes(entry.pc.connectionState))return false;
+ const now=Date.now();if(now-(voiceRequestAt.get(other)||0)<5000)return false;
+ voiceRequestAt.set(other,now);send({type:'signal',to:other,signal:{retry:true,key:song.key}});return true;
 }
-async function offer(other){if(peers.has(other)||!stream)return;const {pc}=link(other);stream.getTracks().forEach(t=>pc.addTrack(t,stream));await pc.setLocalDescription(await pc.createOffer());send({type:'signal',to:other,signal:{desc:pc.localDescription}})}
-async function signal(m){const s=m.signal;if(!s||(!stream&&m.from!==song?.owner))return;
- const e=link(m.from);if(s.desc){await e.pc.setRemoteDescription(s.desc);for(const c of e.pending.splice(0))await e.pc.addIceCandidate(c);if(s.desc.type==='offer'){await e.pc.setLocalDescription(await e.pc.createAnswer());send({type:'signal',to:m.from,signal:{desc:e.pc.localDescription}})}}else if(s.candidate){if(e.pc.remoteDescription)await e.pc.addIceCandidate(s.candidate);else e.pending.push(s.candidate)}}
+function recoverPeer(other,entry){
+ if(peers.get(other)!==entry||song?.key!==entry.turn)return;
+ const attempts=voiceRetries.get(other)||0;if(attempts>=2)return;voiceRetries.set(other,attempts+1);
+ if(stream&&song?.owner===id){closePeer(entry);peers.delete(other);offer(other).catch(()=>voiceStatus());return;}
+ const wait=Math.max(0,5000-(Date.now()-(voiceRequestAt.get(other)||0)));
+ entry.requestTimer=setTimeout(()=>{
+  if(peers.get(other)!==entry||song?.owner!==other)return;
+  requestVoice(other,true);
+  if((voiceRetries.get(other)||0)<2)entry.retryTimer=setTimeout(()=>recoverPeer(other,entry),5000);
+ },wait);
+}
+function voiceStatus(){
+ const status=$('#voice-status');$('#voice-retry').hidden=!song||song.owner===id;
+ if(!song){status.textContent='Chưa có người hát.';return;}
+ if(song.owner===id){
+  if(!stream){status.textContent=micOpening?'Đang mở micro…':'Micro phát cho phòng đang tắt.';return;}
+  const connectedPeers=[...peers.values()].filter(e=>e.pc.connectionState==='connected').length;
+  status.textContent='Micro: '+(stream.getAudioTracks()[0]?.label||'Đã mở')+' · Kết nối tới '+connectedPeers+'/'+users.filter(u=>u.id!==id).length+' người nghe.';
+ }else{
+  const source=users.find(u=>u.id===song.owner),entry=peers.get(song.owner);
+  status.textContent=!source?.mic?'Người hát đang tắt mic.':entry?.pc.connectionState==='connected'?'Đã kết nối giọng hát.':(voiceRetries.get(song.owner)||0)>=2?'Giọng hát bị gián đoạn. Chạm “Kết nối lại giọng hát” để thử lại.':entry?.pc.connectionState==='failed'?'Đang thử kết nối lại giọng hát…':'Đang kết nối giọng hát…';
+ }
+}
+function link(other,voiceId){
+ if(peers.has(other))return peers.get(other);
+ const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},...ice]});const entry={pc,pending:[],turn:song?.key,voiceId:voiceId||crypto.randomUUID(),signals:Promise.resolve(),createdAt:Date.now(),recoveryAttempts:0};peers.set(other,entry);
+ pc.onconnectionstatechange=()=>{
+  voiceStatus();
+  if(pc.connectionState==='connected'){voiceRetries.delete(other);entry.recoveryAttempts=0;clearTimeout(entry.retryTimer);clearTimeout(entry.requestTimer);}
+  if(pc.connectionState==='failed'||pc.connectionState==='disconnected'){
+   clearTimeout(entry.retryTimer);
+   entry.retryTimer=setTimeout(()=>recoverPeer(other,entry),pc.connectionState==='failed'?1000:4000);
+  }
+ };
+ pc.onicecandidate=e=>{if(e.candidate)send({type:'signal',to:other,signal:{candidate:e.candidate,key:entry.turn,voiceId:entry.voiceId}})};
+ pc.ontrack=e=>{if(entry.audio){entry.audio.srcObject=null;entry.audio.remove();}const audio=document.createElement('audio');audio.autoplay=true;audio.setAttribute('playsinline','');audio.hidden=true;audio.srcObject=e.streams[0]||new MediaStream([e.track]);entry.audio=audio;document.body.append(audio);output.attach(audio);audio.play().catch(()=>{output.block();if(!output.muted)notice('Mở Phòng hát và bấm Kết nối lại giọng hát để bật tiếng.');});voiceStatus();};return entry;
+}
+async function offer(other){
+ if(!stream||song?.owner!==id||!users.some(u=>u.id===other))return;
+ const existing=peers.get(other);if(existing&&!['failed','closed'].includes(existing.pc.connectionState))return;
+ if(existing){closePeer(existing);peers.delete(other);}
+ const entry=link(other),{pc}=entry,turn=song?.key;
+ try{stream.getTracks().forEach(t=>pc.addTrack(t,stream));await pc.setLocalDescription(await pc.createOffer());if(song?.key===turn&&peers.get(other)===entry)send({type:'signal',to:other,signal:{desc:pc.localDescription,key:turn,voiceId:entry.voiceId}});}
+ catch(error){if(peers.get(other)===entry){closePeer(entry);peers.delete(other);}throw error;}
+}
+async function signal(m){
+ const s=m.signal;if(!s||s.key&&s.key!==song?.key||(!stream&&m.from!==song?.owner)||!users.some(u=>u.id===m.from))return;
+ let e=peers.get(m.from);
+ if(s.retry===true){if(stream&&song?.owner===id&&s.key===song.key&&Date.now()-(voiceRequestAt.get(m.from)||0)>=5000){voiceRequestAt.set(m.from,Date.now());if(e&&Date.now()-e.createdAt<6000&&!['failed','closed'].includes(e.pc.connectionState))return;if(e){closePeer(e);peers.delete(m.from);}await offer(m.from);}return;}
+ if(s.voiceId&&retiredVoices.has(s.voiceId))return;
+ // Candidates from a replacement connection can precede its SDP offer. Keep
+ // those separate from the old connection instead of mixing their ICE data.
+ if(s.candidate&&s.voiceId&&e?.voiceId!==s.voiceId){
+  if(song?.owner===id)return;
+  const candidates=candidateBacklog.get(s.voiceId)||[];if(candidates.length<32)candidates.push(s.candidate);
+  candidateBacklog.set(s.voiceId,candidates);while(candidateBacklog.size>8)candidateBacklog.delete(candidateBacklog.keys().next().value);return;
+ }
+ if(s.desc?.type==='offer'){
+  if(m.from!==song?.owner)return;
+  if(e&&s.voiceId&&e.voiceId!==s.voiceId){closePeer(e);peers.delete(m.from);e=null;}
+ }else if(s.desc?.type==='answer'&&(!stream||song?.owner!==id||!e||s.voiceId&&s.voiceId!==e.voiceId))return;
+ e=link(m.from,s.voiceId);
+ if(s.voiceId&&candidateBacklog.has(s.voiceId)){e.pending.push(...candidateBacklog.get(s.voiceId));candidateBacklog.delete(s.voiceId);}
+ const task=e.signals.then(async()=>{
+  if(peers.get(m.from)!==e||s.key&&s.key!==song?.key)return;
+  if(s.desc){
+   await e.pc.setRemoteDescription(s.desc);
+   for(const c of e.pending.splice(0))try{await e.pc.addIceCandidate(c);}catch{}
+   if(s.desc.type==='offer'&&peers.get(m.from)===e){await e.pc.setLocalDescription(await e.pc.createAnswer());send({type:'signal',to:m.from,signal:{desc:e.pc.localDescription,key:e.turn,voiceId:e.voiceId}});}
+  }else if(s.candidate){if(e.pc.remoteDescription)await e.pc.addIceCandidate(s.candidate);else e.pending.push(s.candidate);}
+ });
+ e.signals=task.catch(()=>{});return task;
+}
 const elapsed=()=>songElapsed(song,serverClock.now());
 function checkPlayback(){if(ready&&song)playback.check({song,id,player,elapsed:elapsed()});}
 function sync(){
@@ -91,10 +163,10 @@ const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
  const old=song;song=m.song;const mine=song?.owner===id;users=m.users;chat.history(m.chat||[]);if(song&&!yt.isConnected)document.head.append(yt);serverClock.observe(m.now);
- const changedTurn=old?.key!==song?.key,keepMic=stream&&mine&&old?.owner===id;
- if(changedTurn&&keepMic){for(const entry of peers.values())entry.pc.close();peers.clear();}
+ const changedTurn=old?.key!==song?.key;if(changedTurn){voiceRetries.clear();candidateBacklog.clear();voiceRequestAt.clear();}const keepMic=stream&&mine&&old?.owner===id;
+ if(changedTurn&&keepMic){for(const entry of peers.values())closePeer(entry);peers.clear();}
  else if(changedTurn||stream&&!mine||!mine&&!users.find(u=>u.id===song?.owner)?.mic)stopMic();
- for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){e.pc.close();peers.delete(pid)}
+ for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){closePeer(e);peers.delete(pid)}
  hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song);const me=users.find(u=>u.id===id);
  facePicker.select(me?.face??chosenFace);
  skinPicker.value=skinIndex(me?.skin??chosenSkin);
@@ -104,8 +176,9 @@ function render(m){
  if(song)row($('#songs'),'♫　'+song.title+' · '+ownerName(song));else row($('#songs'),'Sân khấu đang trống.',true);
  m.queue.forEach((s,i)=>row($('#songs'),(i+1)+'. '+s.title+' · '+ownerName(s),true));
  if(stream&&mine&&me?.mic)users.filter(u=>u.id!==id).forEach(u=>offer(u.id).catch(()=>notice('Chưa kết nối được mic tới một người nghe.')));
+ else if(song&&!mine&&users.find(u=>u.id===song.owner)?.mic&&!peers.has(song.owner))requestVoice(song.owner);
  if(old?.key!==song?.key||old?.pausedAt!==song?.pausedAt){notice('');sync()}
- singerMic.auto();
+ singerMic.auto();voiceStatus();
 }
 function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
@@ -118,7 +191,7 @@ function connect(){
    serverClock.stop();search.disconnected();connected=false;updateMicControls();$('#emote').disabled=$('#pause').disabled=$('#next').disabled=true;
    // Keep capture and song time across Function rotation. Rebuild peers only
    // after the room acknowledges mic, so listeners see the state before offers.
-   if(stream){for(const entry of peers.values())entry.pc.close();peers.clear();}
+   if(stream){for(const entry of peers.values())closePeer(entry);peers.clear();}
    $('#status').textContent=status==='connecting'?'Đang kết nối':'Đang kết nối lại';
   },onError:notice,
  });connection.connect();
@@ -133,6 +206,7 @@ $('#singer-test-mic').onclick=()=>{showPanel('room');if($('#mic-test-panel').hid
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=()=>{if(stream){stopMic();send({type:'mic',on:false});}else singerMic.start();};
 $('#singer-mic').onclick=()=>$('#mic').click();
+$('#voice-retry').onclick=()=>{output.enable();if(song?.owner!==id&&song){voiceRetries.delete(song.owner);requestVoice(song.owner,true);}};
 
 let flowerAt=-Infinity;
 $('#throw-flower').onclick=()=>{if(!connected||!song||song.owner===id||performance.now()-flowerAt<1200)return;if(send({type:'flower',key:song.key})){flowerAt=performance.now();hall?.focus();}};
