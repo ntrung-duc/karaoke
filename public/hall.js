@@ -12,6 +12,7 @@ import {pathToSeat} from './navigation.js';
 import {createRenderBudget} from './render-budget.js';
 import {emoteName} from './emotes.js';
 import {createJoystick,createTouchCamera} from './mobile-controls.js';
+import {singerScreenRect} from './singer-layout.js';
 export function buildHall(view,send,me){
  const scene=new T.Scene(),overlay=new T.Scene(),camera=new T.PerspectiveCamera(62,1,.08,95);
  const web=new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
@@ -152,7 +153,10 @@ export function buildHall(view,send,me){
  window.addEventListener('resize',releaseControls);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseControls();});
  document.addEventListener('focusin',e=>{if(e.target.closest('input,textarea,select,button,[contenteditable="true"]')){joystick.reset();input.clear();}});
- new ResizeObserver(()=>{const w=view.clientWidth,h=view.clientHeight;web.setSize(w,h);css.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}).observe(view);
+ let lyricLayoutDirty=true,lyricRect;
+ const hudObserver=new ResizeObserver(()=>{lyricLayoutDirty=true;});
+ for(const element of [document.querySelector('#chat-form'),document.querySelector('#singer-controls'),document.querySelector('#joystick')])hudObserver.observe(element);
+ new ResizeObserver(()=>{const w=view.clientWidth,h=view.clientHeight;web.setSize(w,h);css.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();lyricLayoutDirty=true;}).observe(view);
  function draw(t){requestAnimationFrame(draw);const frameMs=t-previous,dt=Math.min(.1,frameMs/1000);previous=t;
  if(!document.hidden){const ratio=renderBudget.sample(frameMs);if(ratio!==pixelRatio){pixelRatio=ratio;web.setPixelRatio(ratio);}}
  if(cameraControls.mode!=='overview'&&self){const controls=!blocked()&&!editing(document.activeElement);
@@ -189,8 +193,12 @@ export function buildHall(view,send,me){
  host.setAttribute('aria-label',privateScreen?'Màn hình riêng của người hát':'Màn hình phòng hát');
  host.style.outline=privateScreen?'5px solid #bda2f0':'none';
  if(privateScreen){
-  const distance=1.5,height=2*distance*Math.tan(camera.fov*Math.PI/360),width=height*camera.aspect,w=Math.min(width*.46,1),h=w*450/800;
-  privateOffset.set(-width/2+w/2+width*.03,-height/2+h/2+height*.09,-distance).applyQuaternion(camera.quaternion);
+  if(lyricLayoutDirty||!lyricRect){
+   const bounds=view.getBoundingClientRect(),chat=document.querySelector('#chat-form').getBoundingClientRect(),controls=document.querySelector('#singer-controls').getBoundingClientRect(),stick=document.querySelector('#joystick').getBoundingClientRect();
+   lyricRect=singerScreenRect(bounds.width,bounds.height,{chatTop:chat.top-bounds.top,controlsBottom:controls.height&&controls.top-bounds.top<bounds.height/2?controls.bottom-bounds.top:0,joystick:stick.width?{left:stick.left-bounds.left,right:stick.right-bounds.left,top:stick.top-bounds.top}:null});lyricLayoutDirty=false;
+  }
+  const distance=1.5,height=2*distance*Math.tan(camera.fov*Math.PI/360),scale=height/view.clientHeight,w=lyricRect.width*scale,h=lyricRect.height*scale;
+  privateOffset.set((lyricRect.x+lyricRect.width/2-view.clientWidth/2)*scale,(view.clientHeight/2-lyricRect.y-lyricRect.height/2)*scale,-distance).applyQuaternion(camera.quaternion);
   display.position.copy(camera.position).add(privateOffset);display.quaternion.copy(camera.quaternion);display.scale.set(w/800,h/450,1);
  }else{display.position.set(rear.x,rear.y,rear.z+.015);display.rotation.set(0,rear.rot,0);display.scale.set(rear.w/800,rear.h/450,1);}
  privateHole.visible=active&&privateScreen;privateHole.position.copy(display.position);privateHole.quaternion.copy(display.quaternion);privateHole.scale.copy(display.scale);
