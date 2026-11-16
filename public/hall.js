@@ -2,7 +2,7 @@ import {createFlowers} from './flowers.js';
 import {createScenery,batchStaticBoxes} from './scenery.js';
 import * as T from 'three';
 import {CSS3DRenderer,CSS3DObject} from '/lib/css.js';
-import {seats,position,clearSeat} from './layout.js';
+import {seats,position,clearSeat,floorHeight} from './layout.js';
 import {createAvatar,loadMotions} from './avatar.js';
 import {jumpPose,displacementGait,WALK_SPEED} from './motion.js';
 import {relativeHeadYaw,faceIndex,skinIndex,shirtColor} from './avatar-settings.js';
@@ -41,7 +41,7 @@ export function buildHall(view,send,me){
  const focusHall=()=>{if(!welcome.open)web.domElement.focus({preventScroll:true});};
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
- seats.forEach((seat,index)=>seatProxy.setMatrixAt(index,seatMatrix.makeTranslation(seat.x,.9,seat.z+.04)));seatProxy.computeBoundingSphere();seatProxy.updateMatrixWorld(true);
+ seats.forEach((seat,index)=>seatProxy.setMatrixAt(index,seatMatrix.makeTranslation(seat.x,(seat.y||0)+.9,seat.z+.04)));seatProxy.computeBoundingSphere();seatProxy.updateMatrixWorld(true);
  const arrowShape=new T.Shape();arrowShape.moveTo(-.075,.32);arrowShape.lineTo(.075,.32);arrowShape.lineTo(.075,.04);arrowShape.lineTo(.23,.04);arrowShape.lineTo(0,-.24);arrowShape.lineTo(-.23,.04);arrowShape.lineTo(-.075,.04);arrowShape.closePath();
  const seatOutline=new T.Mesh(new T.ShapeGeometry(arrowShape),new T.MeshBasicMaterial({color:'#d5b5ff',side:T.DoubleSide,depthTest:false,depthWrite:false,transparent:true,opacity:1}));seatOutline.visible=false;seatOutline.renderOrder=999;scene.add(seatOutline);
  const tooltip=document.createElement('div');tooltip.id='seat-tooltip';tooltip.setAttribute('role','tooltip');tooltip.hidden=true;document.querySelector('main').append(tooltip);
@@ -58,7 +58,7 @@ export function buildHall(view,send,me){
   hoverDirty=false;if(!hoverPoint||drag||welcome.open){hideSeatHover();return;}
   const index=pickSeat(hoverPoint[0],hoverPoint[1]);if(index===null){hideSeatHover();return;}
   const seat=seats[index],occupant=[...actors.values()].find(a=>a.user?.seat===index)?.user;
-  seatOutline.position.set(seat.x,2.12,seat.z+.04);seatOutline.rotation.set(0,camera.rotation.y,0);seatOutline.material.color.set(occupant&&occupant.id!==me()?'#ffba78':'#d5b5ff');seatOutline.visible=true;
+  seatOutline.position.set(seat.x,(seat.y||0)+2.12,seat.z+.04);seatOutline.rotation.set(0,camera.rotation.y,0);seatOutline.material.color.set(occupant&&occupant.id!==me()?'#ffba78':'#d5b5ff');seatOutline.visible=true;
   tooltip.textContent='Ghế '+(index+1)+' · '+(occupant?(occupant.id===me()?'Bạn đang ngồi':'Đã có người'):'Trống');tooltip.dataset.seat=String(index+1);tooltip.hidden=false;
   tooltip.style.left=Math.max(8,Math.min(innerWidth-190,hoverPoint[0]+14))+'px';tooltip.style.top=Math.max(8,Math.min(innerHeight-44,hoverPoint[1]-36))+'px';
  }
@@ -86,7 +86,7 @@ export function buildHall(view,send,me){
  const target=sitting?0:(u.bodyYaw??(singer?Math.PI:0));
  a.facing=id===me()?target:base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
- a.body.position.y=(singer?1:0)+jump.height;
+ a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z))+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
  a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);
@@ -180,13 +180,14 @@ export function buildHall(view,send,me){
  if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;self.emoteAt=0;}
  const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,false):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
  const eyeHeight=self.seat>=0?1.80:1.61,orbitHeight=1.05;
- camera.position.set(self.x,(api.owner===me()?1:0)+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
+ const baseY=self.seat>=0?(seats[self.seat]?.y||0):(api.owner===me()?1:floorHeight(self.z));
+  camera.position.set(self.x,baseY+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
  if(cameraControls.mode==='avatar'){
   const {yaw,pitch,distance}=cameraControls,horizontal=Math.cos(pitch)*distance;
   camera.rotation.set(pitch,yaw,0,'YXZ');
   camera.position.x+=Math.sin(yaw)*horizontal;camera.position.z+=Math.cos(yaw)*horizontal;camera.position.y-=Math.sin(pitch)*distance;
   camera.position.x=T.MathUtils.clamp(camera.position.x,-9.24,9.24);camera.position.z=T.MathUtils.clamp(camera.position.z,-7.05,16.02);
-  camera.position.y=T.MathUtils.clamp(camera.position.y,.3,7);
+  camera.position.y=T.MathUtils.clamp(camera.position.y,.3,10.2);
  }else camera.rotation.set(self.pitch,self.yaw,0,'YXZ');
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
