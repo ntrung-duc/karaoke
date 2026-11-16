@@ -77,7 +77,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
    record.pending=record.pending.then(task).catch(fail);return record.pending;
   }
   client.on('error',()=>client.terminate());
-  client.on('pong',()=>{record.alive=true;});
+  client.on('pong',()=>{record.alive=true;record.missedPongs=0;});
   client.on('message',raw=>{
    let message;try{message=JSON.parse(raw);}catch{return;}
    if(!message||typeof message!=='object'||record.closed)return;
@@ -131,7 +131,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
    send(record,{type:'hello',id:result.id,ice,resumeToken:result.token});record.ready=true;
    receive(record,{message:result.snapshot});for(const event of record.buffer.splice(0))receive(record,event);
    record.heartbeat=setInterval(()=>{
-    if(!record.alive){client.terminate();return;}
+    if(!record.alive){record.missedPongs=(record.missedPongs||0)+1;if(record.missedPongs>=3){client.terminate();return;}}
     record.alive=false;client.ping();
     enqueue(async()=>{
      if(record.closed)return;

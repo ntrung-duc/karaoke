@@ -32,6 +32,7 @@ export function createConnection({room,onHello,onMessage,onStatus,onError=()=>{}
   current.onclose=event=>{
    if(stopped||socket!==current)return;
    established=false;
+   console.warn('Karaoke connection closed',{code:event.code,reason:event.reason||'No close reason',clean:event.wasClean});
    clearTimer(handshakeTimer);
    if(event.code===4001||event.code===1008){saveToken(undefined);revision=0;}
    onStatus?.('reconnecting');clearTimer(timer);
