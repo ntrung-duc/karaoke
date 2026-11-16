@@ -52,7 +52,7 @@ nav{right:calc(18px + env(safe-area-inset-right))}nav button{white-space:normal;
  aside{top:calc(50px + env(safe-area-inset-top));bottom:calc(176px + env(safe-area-inset-bottom));max-height:none;overflow-y:auto}
  #singer-controls button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;min-height:30px;padding:3px;flex-shrink:0;border-radius:7px}
  #singer-controls .control-label,#singer-controls #emote-choice{display:none}#singer-controls .control-icon{font-size:17px}#singer-controls .control-icon svg{width:20px;height:20px}
- .room-emote{display:block;margin:14px 0}.room-emote select{width:100%;padding:9px;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;font:inherit;font-size:16px}
+ .room-emote{display:block;margin:14px 0}.room-emote select{width:100%;padding:9px;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;font:inherit}
 }
 
 #chat-form #throw-flower{flex:none;width:42px;min-width:42px;padding:5px;font-size:25px;line-height:1;touch-action:manipulation}
@@ -63,5 +63,3 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 }
 
 #singer-screen{position:fixed;z-index:2;pointer-events:none;overflow:hidden;background:#121212;border:2px solid #bda2f0;border-radius:6px}#singer-screen iframe{display:block;width:100%;height:100%;border:0}
-
-#mic-input{width:100%;padding:9px;margin-bottom:12px;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;font:inherit;font-size:16px}
