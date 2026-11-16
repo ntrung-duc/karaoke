@@ -1,4 +1,38 @@
-export const songElapsed=(song,now)=>Math.max(0,((Number.isFinite(song.pausedAt)?song.pausedAt:now)-song.start)/1000);
+export const songElapsed=(song,now)=>song.buffering&&song.playhead?Math.max(0,song.playhead.position):Math.max(0,((Number.isFinite(song.pausedAt)?song.pausedAt:now)-song.start)/1000);
+
+export function createPlayheadReporter(send,clock=Date.now){
+ let key=null,state=null,last=-Infinity;
+ return {check({song,id,player}){
+  if(!song||song.owner!==id||Number.isFinite(song.pausedAt)||player.getVideoData()?.video_id!==song.video)return;
+  const next=player.getPlayerState(),position=player.getCurrentTime(),now=clock();
+  if(![1,3].includes(next)||!Number.isFinite(position)||position<0)return;
+  if(key===song.key&&now-last<(state===next?900:200))return;
+  if(send({type:'playhead',key:song.key,video:song.video,position,state:next,sampleAt:now})!==false){key=song.key;state=next;last=now;}
+ }};
+}
+
+// Correct spectators against the singer's clock, without repeatedly seeking
+// the singer or seeking a player that is already buffering.
+export function createVideoSync(clock=Date.now){
+ let key=null,paused=false,holding=false,lastSeek=-Infinity,lastPlay=-Infinity;
+ return {sync({song,id,player,now}){
+  if(!song){if(key!==null)player.stopVideo();key=null;paused=holding=false;return false;}
+  const target=songElapsed(song,now),manual=Number.isFinite(song.pausedAt),wait=!!song.buffering&&song.owner!==id,time=clock();
+  if(key!==song.key){key=song.key;paused=manual;holding=wait;lastSeek=lastPlay=-Infinity;const video={videoId:song.video,startSeconds:target};if(manual||wait)player.cueVideoById(video);else player.loadVideoById(video);return true;}
+  if(player.getVideoData()?.video_id!==song.video)return false;
+  const state=player.getPlayerState(),position=player.getCurrentTime(),drift=target-position,resume=(paused&&!manual)||(holding&&!wait);
+  paused=manual;holding=wait;
+  if(manual||wait){
+   if(state===1)player.pauseVideo();
+   if(state!==3&&Math.abs(drift)>.35&&time-lastSeek>1500){lastSeek=time;player.seekTo(target,true);}
+   return false;
+  }
+  if(resume){lastSeek=lastPlay=time;player.seekTo(target,true);player.playVideo();return false;}
+  if(state===1&&song.owner!==id&&Math.abs(drift)>.45&&time-lastSeek>2500){lastSeek=time;player.seekTo(target,true);}
+  else if([2,5].includes(state)&&time-lastPlay>2000){lastPlay=time;player.playVideo();}
+  return false;
+ }};
+}
 
 // ENDED events can be missed during reconnect/background playback. Polling and
 // a server-side deadline are complementary; the song key makes retries safe.
@@ -12,9 +46,9 @@ export function createPlaybackMonitor(send,clock=Date.now){
   if(Math.abs((song.duration||0)-duration)>.1&&(durationAttempt!==signature||now-durationAt>3000)){
    durationAttempt=signature;durationAt=now;send({type:'duration',key:song.key,video:song.video,duration});
   }
-  if(Number.isFinite(song.pausedAt))return;
+  if(Number.isFinite(song.pausedAt)||song.buffering)return;
   const ended=elapsed>=Math.max(0,duration-3)&&player.getPlayerState()===0&&player.getCurrentTime()>=duration-.75;
-  if((ended||elapsed>=duration+2)&&(nextAttempt!==song.key||now-nextAt>1500)){
+  if((ended||elapsed>=duration+2&&player.getPlayerState()!==3&&player.getCurrentTime()>=duration-.75)&&(nextAttempt!==song.key||now-nextAt>1500)){
    nextAttempt=song.key;nextAt=now;send({type:'next',key:song.key});
   }
  }};

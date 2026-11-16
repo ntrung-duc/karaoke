@@ -81,6 +81,13 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
   client.on('message',raw=>{
    let message;try{message=JSON.parse(raw);}catch{return;}
    if(!message||typeof message!=='object'||record.closed)return;
+   // Clock probes bypass Redis and command queues so storage load cannot bias RTT.
+   if(message.type==='clock'){
+    if(record.ready&&record.id&&Number.isSafeInteger(message.seq)&&message.seq>0&&(!record.clockAt||now()-record.clockAt>=100)){
+     record.clockAt=now();send(record,{type:'clock',seq:message.seq,serverTime:now()});
+    }
+    return;
+   }
    // Search runs independently so an upstream request never queues WASD/jump.
    if(message.type==='search'){
     if(!record.ready||!record.id||typeof message.requestId!=='string'||! /^[\w-]{1,64}$/.test(message.requestId)||record.searching)return;

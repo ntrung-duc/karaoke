@@ -127,14 +127,29 @@ export function applyMessage(room,id,connectionId,message,now){
   case 'playback':{
    if(!singer||message.key!==room.song.key||typeof message.paused!=='boolean')return {events};
    const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return {events};
-   if(message.paused){room.song.pausedAt=now;delete room.song.endAt;}
+   if(message.paused){room.song.pausedAt=room.song.buffering?room.song.playhead.at:now;delete room.song.endAt;}
    else{room.song.start=room.song.awaitingStart?now:room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
+   delete room.song.playhead;delete room.song.buffering;
+   if(!message.paused&&message.sync===true){
+    room.song.playhead={position:Math.max(0,(now-room.song.start)/1000),at:now,state:3,receivedAt:now-1000};room.song.buffering=true;delete room.song.endAt;
+   }
+   break;
+  }
+  case 'playhead':{
+   if(!singer||message.key!==room.song.key||message.video!==room.song.video||Number.isFinite(room.song.pausedAt)||![1,3].includes(message.state)||!Number.isFinite(message.position)||message.position<0||message.position>21600||room.song.duration&&message.position>room.song.duration+1)return {events};
+   const previous=room.song.playhead;
+   if(previous&&now-previous.receivedAt<(previous.state===message.state?900:150))return {events};
+   const at=Number.isFinite(message.sampleAt)?Math.max(now-2000,Math.min(now,message.sampleAt)):now;
+   room.song.playhead={position:message.position,at,state:message.state,receivedAt:now};
+   room.song.buffering=message.state===3;room.song.start=at-message.position*1000;
+   if(room.song.buffering)delete room.song.endAt;
+   else if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;
    break;
   }
   case 'duration':
    if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};
    if(room.song.duration===message.duration)return {events};
-   room.song.duration=message.duration;if(!Number.isFinite(room.song.pausedAt))room.song.endAt=room.song.start+message.duration*1000;break;
+   room.song.duration=message.duration;if(!Number.isFinite(room.song.pausedAt)&&!room.song.buffering)room.song.endAt=room.song.start+message.duration*1000;break;
   case 'mic':if(!singer)return {events};data.mic=!!message.on;break;
   case 'leave':removeMember(room,id,now);break;
   default:return {events};
