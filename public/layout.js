@@ -1,6 +1,6 @@
 // Keep the original seat indices stable for people already in the room.
 export const seats = [[-3.4,-1.9,1.9,3.4],[-6.4,-4.9,4.9,6.4]].flatMap(columns=>
- Array.from({length:20},(_,i)=>({x:columns[i%4],z:1+Math.floor(i/4)*2,y:Math.floor(i/4)*0.65})));
+ Array.from({length:20},(_,i)=>({x:columns[i%4],z:1+Math.floor(i/4)*2,y:Math.floor(i/4)*1.0})));
 export function position(x,z,stage) {
   const limit=(v,a,b)=>Math.min(b,Math.max(a,v));
   return {x:limit(x,stage?-6:-9,stage?6:9),z:limit(z,stage?-6.6:-1.6,stage?-3:15.65)};
@@ -9,9 +9,9 @@ export function clearSeat(x,z){return seats.every(s=>Math.abs(s.x-x)>.64 || Math
 
 
 export function floorHeight(z) {
-  if (z >= 8) return 2.6;
-  if (z >= 6) return 1.95;
-  if (z >= 4) return 1.3;
-  if (z >= 2) return 0.65;
+  if (z >= 8) return 4.0;
+  if (z >= 6) return 3.0;
+  if (z >= 4) return 2.0;
+  if (z >= 2) return 1.0;
   return 0;
 }

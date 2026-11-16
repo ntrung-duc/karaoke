@@ -29,7 +29,7 @@ export function batchStaticBoxes(scene,geometry){
 export function createScenery(scene,box,mat){
  const gold='#c39852',wood='#583a2f',dark='#32232a';
  box(0,-.14,4,20,.28,26,'#4b4862');
- for(let r=1;r<=4;r++){const stepFront=r*2,stepLen=19-stepFront;box(0,.65*(r-.5),stepFront+stepLen/2,19.2,.65,stepLen,'#4b4862');}box(0,4,-8,20,8,.3,dark);
+ for(let r=1;r<=4;r++){const stepFront=r*2,stepLen=19-stepFront;box(0,1.0*(r-.5),stepFront+stepLen/2,19.2,1.0,stepLen,'#4b4862');}box(0,4,-8,20,8,.3,dark);
  for(const x of [-9.65,9.65]){box(x,3,4,.23,6.3,26,'#b49779');box(x,1.65,4,.27,.07,26,gold);
  for(let z=-6;z<=13;z+=3){box(x*.99,2.9,z,.15,5.8,.11,wood);box(x*.98,3.25,z,.22,.62,.26,'#ffce87')}}
  box(0,.48,-5.25,14,.96,5.7,wood);box(0,.95,-5.25,14,.09,5.7,'#bc9875');box(0,.83,-2.38,14,.06,.05,gold);
@@ -48,8 +48,8 @@ export function createScenery(scene,box,mat){
  box(x*.99,1.79,z,.08,.055,3.91,'#ffe0a0');
  for(let j=0;j<12;j++)box(x*.986,4.6,z-1.74+j*.31,.13,3.45+.25*Math.cos(j*.5),.075,'#93795f');
  }
- for(let i=0;i<8;i++){const z=-7+i*3.3;box(0,9.05,z,19.6,.22,3.28,'#bb9d7f');box(0,8.89,z-1.55,19,.065,.084,'#fff0ce')}
- for(const x of [-9.65,9.65])box(x,7.6,4,.23,3.0,26,'#ab9077');box(0,4.4,16.8,19.6,9.2,.22,'#443e58'); function art(){
+ for(let i=0;i<8;i++){const z=-7+i*3.3;box(0,10.65,z,19.6,.22,3.28,'#bb9d7f');box(0,10.49,z-1.55,19,.065,.084,'#fff0ce')}
+ for(const x of [-9.65,9.65])box(x,8.4,4,.23,4.6,26,'#ab9077');box(0,5.2,16.8,19.6,10.8,.22,'#443e58'); function art(){
  const c=document.createElement('canvas');c.width=1200;c.height=500;const a=c.getContext('2d'),g=a.createLinearGradient(0,0,1200,500);g.addColorStop(0,'#32192b');g.addColorStop(.55,'#682d43');g.addColorStop(1,'#361e31');a.fillStyle=g;a.fillRect(0,0,1200,500);a.strokeStyle='#bc925d';a.lineWidth=3;a.strokeRect(20,20,1160,460);a.strokeRect(30,30,1140,440);
  for(let i=0;i<15;i++){a.beginPath();a.arc(600,720,345+i*14,Math.PI,Math.PI*2);a.strokeStyle='rgba(233,185,128,.15)';a.stroke()}
  a.textAlign='center';a.fillStyle='#f3d99f';a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
@@ -75,12 +75,12 @@ export function createScenery(scene,box,mat){
   else{texture.repeat.x=1/ratio;texture.offset.x=(1-1/ratio)/2;}
   wallMaterial.map=texture;wallMaterial.color.set('#ffffff');wallMaterial.needsUpdate=true;
  });
- const wallArt=new T.Mesh(new T.PlaneGeometry(18.9,5.9),wallMaterial);wallArt.name='RearWallMural';wallArt.rotation.y=Math.PI;wallArt.position.set(0,4.6,16.65);scene.add(wallArt);
- box(0,2.8,16.48,3.65,5.6,.3,'#817b96');
- for(const side of [-1,1]){box(side*.78,2.51,16.24,1.53,4.98,.18,'#aaaabc');box(side*.78,2.52,16.14,.036,4.86,.03,'#67697a')}
- box(0,5.26,16.23,.96,.22,.15,'#252431');box(2.12,2.77,16.37,.27,.46,.13,'#a3a1ad');
+ const wallArt=new T.Mesh(new T.PlaneGeometry(18.9,5.9),wallMaterial);wallArt.name='RearWallMural';wallArt.rotation.y=Math.PI;wallArt.position.set(0,6.0,16.65);scene.add(wallArt);
+ box(0,3.6,16.48,3.65,7.2,.3,'#817b96');
+ for(const side of [-1,1]){box(side*.78,3.31,16.24,1.53,6.58,.18,'#aaaabc');box(side*.78,3.32,16.14,.036,6.46,.03,'#67697a')}
+ box(0,6.86,16.23,.96,.22,.15,'#252431');box(2.12,4.37,16.37,.27,.46,.13,'#a3a1ad');
  function glow(x,y,z,w,h,d,color){const block=box(x,y,z,w,h,d,color);block.material=new T.MeshBasicMaterial({color});block.castShadow=false;return block}
- glow(2.12,2.77,16.28,.095,.095,.04,'#a7a0bc');glow(0,5.27,16.12,.29,.034,.02,'#aca0bf');
+ glow(2.12,4.37,16.28,.095,.095,.04,'#a7a0bc');glow(0,6.87,16.12,.29,.034,.02,'#aca0bf');
  // Plastic studs on the stage lip evoke a brick-built game world.
  const studGeo=new T.CylinderGeometry(.084,.084,.055,12);
  const studs=new T.InstancedMesh(studGeo,mat('#a18273'),74);const matrix=new T.Matrix4();
