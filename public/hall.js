@@ -185,7 +185,7 @@ export function buildHall(view,send,me){
   camera.rotation.set(pitch,yaw,0,'YXZ');
   camera.position.x+=Math.sin(yaw)*horizontal;camera.position.z+=Math.cos(yaw)*horizontal;camera.position.y-=Math.sin(pitch)*distance;
   camera.position.x=T.MathUtils.clamp(camera.position.x,-9.24,9.24);camera.position.z=T.MathUtils.clamp(camera.position.z,-7.05,16.02);
-  camera.position.y=T.MathUtils.clamp(camera.position.y,.3,7);
+  camera.position.y=T.MathUtils.clamp(camera.position.y,.3,8.6);
  }else camera.rotation.set(self.pitch,self.yaw,0,'YXZ');
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
