@@ -61,3 +61,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media(pointer:coarse),(max-width:800px){
  input:not([type=range]):not([type=color]):not([type=checkbox]),textarea,select,#skin-picker,#singer-controls #emote-choice{font-size:16px}
 }
+
+#singer-screen{position:fixed;z-index:2;pointer-events:none;overflow:hidden;background:#121212;border:2px solid #bda2f0;border-radius:6px}#singer-screen iframe{display:block;width:100%;height:100%;border:0}

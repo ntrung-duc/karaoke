@@ -25,7 +25,6 @@ export function buildHall(view,send,me){
  function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.79}));return materials.get(c)}
  function box(x,y,z,w,h,d,c,parent=scene){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
  const {rear,poster,hole,spot,shaft,fixture}=createScenery(scene,box,mat);
- const privateHole=new T.Mesh(new T.PlaneGeometry(800,450),hole.clone());privateHole.name='PrivateSingerScreen';privateHole.material.depthTest=false;privateHole.material.depthWrite=false;privateHole.renderOrder=1000;privateHole.visible=false;scene.add(privateHole);
  batchStaticBoxes(scene,cube);
  const axis=new T.Vector3(0,1,0),ray=new T.Vector3(),aim=new T.Vector3();
  function focusStage(dt){
@@ -75,7 +74,8 @@ export function buildHall(view,send,me){
  function actor(u){
  const avatar=createAvatar(palette[u.color],mat);scene.add(avatar.body);return avatar;
  }
- const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:none';const target=document.createElement('div');target.id='player';host.append(target);const display=new CSS3DObject(host);overlay.add(display);const privateOffset=new T.Vector3();
+ const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:none';const target=document.createElement('div');target.id='player';host.append(target);const screenElement=document.createElement('div');screenElement.style.cssText='width:800px;height:450px';screenElement.append(host);const display=new CSS3DObject(screenElement);overlay.add(display);
+ const singerScreen=document.createElement('div');singerScreen.id='singer-screen';singerScreen.hidden=true;document.querySelector('main').append(singerScreen);
  function pose(u){let a=actors.get(u.id);if(!a){a=actor(u);actors.set(u.id,a)}
  if(!a.user)a.body.position.set(u.x,0,u.z);a.user={...u};}
  function animateActors(dt){for(const [id,a] of actors){
@@ -192,7 +192,8 @@ export function buildHall(view,send,me){
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
- flowers.update(now());animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active;
+ flowers.update(now());animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active&&!privateScreen;singerScreen.hidden=!active||!privateScreen;
+ const screenParent=privateScreen?singerScreen:screenElement;if(host.parentElement!==screenParent)screenParent.append(host);host.style.width=privateScreen?'100%':'800px';host.style.height=privateScreen?'100%':'450px';
  host.setAttribute('aria-label',privateScreen?'Màn hình riêng của người hát':'Màn hình phòng hát');
  host.style.outline=privateScreen?'5px solid #bda2f0':'none';
  if(privateScreen){
@@ -200,11 +201,8 @@ export function buildHall(view,send,me){
    const bounds=view.getBoundingClientRect(),chat=document.querySelector('#chat-form').getBoundingClientRect(),controls=document.querySelector('#singer-controls').getBoundingClientRect(),stick=document.querySelector('#joystick').getBoundingClientRect();
    lyricRect=singerScreenRect(bounds.width,bounds.height,{chatTop:chat.top-bounds.top,chatLeft:chat.left-bounds.left,chatBottom:chat.bottom-bounds.top,desktop:!stick.width,controlsBottom:controls.height&&controls.top-bounds.top<bounds.height/2?controls.bottom-bounds.top:0,joystick:stick.width?{left:stick.left-bounds.left,right:stick.right-bounds.left,top:stick.top-bounds.top}:null});lyricLayoutDirty=false;
   }
-  const distance=1.5,height=2*distance*Math.tan(camera.fov*Math.PI/360),scale=height/view.clientHeight,w=lyricRect.width*scale,h=lyricRect.height*scale;
-  privateOffset.set((lyricRect.x+lyricRect.width/2-view.clientWidth/2)*scale,(view.clientHeight/2-lyricRect.y-lyricRect.height/2)*scale,-distance).applyQuaternion(camera.quaternion);
-  display.position.copy(camera.position).add(privateOffset);display.quaternion.copy(camera.quaternion);display.scale.set(w/800,h/450,1);
+  Object.assign(singerScreen.style,{left:lyricRect.x+'px',top:lyricRect.y+'px',width:lyricRect.width+'px',height:lyricRect.height+'px'});
  }else{display.position.set(rear.x,rear.y,rear.z+.015);display.rotation.set(0,rear.rot,0);display.scale.set(rear.w/800,rear.h/450,1);}
- privateHole.visible=active&&privateScreen;privateHole.position.copy(display.position);privateHole.quaternion.copy(display.quaternion);privateHole.scale.copy(display.scale);
  web.render(scene,camera);if(active)css.render(overlay,camera);if(hoverDirty)updateSeatHover();
  if(motionDebug){
   const data=web.domElement.dataset;data.playerX=String(self?.x);data.playerZ=String(self?.z);data.pixelRatio=String(pixelRatio);data.bodyYaw=String(actors.get(me())?.body.rotation.y);
