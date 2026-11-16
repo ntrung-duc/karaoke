@@ -13,6 +13,20 @@ test('two users receive validated movement, authoritative jumps and seat resets'
   child.stdout.on('data',d=>{output+=d;const m=output.match(/localhost:(\d+)/);if(m){clearTimeout(timer);resolve(m[1]);}});
   child.once('error',reject);
  });
+ // Walk the browser module graph through HTTP: syntax/unit checks alone cannot
+ // catch an imported file omitted from the server's explicit public allowlist.
+ const pending=['/app.js'],checked=new Set(),base=`http://127.0.0.1:${port}`;
+ while(pending.length){
+  const path=pending.pop();if(checked.has(path))continue;checked.add(path);
+  const response=await fetch(base+path);assert.equal(response.status,200,`Browser module unavailable: ${path}`);
+  assert.match(response.headers.get('content-type'),/text\/javascript/);
+  const source=await response.text();
+  for(const match of source.matchAll(/^\s*(?:import|export)\s+(?:[^'";]*?\s+from\s*)?['"]([^'"]+)['"]/gm)){
+   const name=match[1],resolved=name==='three'?'/lib/three.module.js':name.startsWith('three/addons/')?'/lib/'+name.slice(13):new URL(name,base+path).pathname;
+   pending.push(resolved);
+  }
+ }
+ assert.ok(checked.has('/flowers.js'),'flower module is included in the entry-point graph');
  for(const path of ['/roblox-avatar.js','/assets/roblox-noob.glb','/input.js','/player-state.js','/camera-controls.js','/avatar.js','/avatar-head.js','/block-avatar.js','/toy-avatar.js','/faces.js','/avatar-settings.js','/scenery.js','/session.js','/motion.js','/assets/face-atlas.png','/assets/human-motions.json','/assets/mannequin.glb','/lib/loaders/GLTFLoader.js','/lib/utils/BufferGeometryUtils.js','/lib/utils/SkeletonUtils.js']){
   const response=await fetch(`http://127.0.0.1:${port}${path}`);assert.equal(response.status,200);
   if(path.endsWith('.json'))assert.match(response.headers.get('content-type'),/application\/json/);

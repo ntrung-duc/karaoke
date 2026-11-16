@@ -6,6 +6,7 @@ const files = new Map([
     .map(file => ['/' + file, 'public/' + file]),
   ['/', 'public/index.html'],
   ['/server-clock.js', 'public/server-clock.js'],
+  ['/flowers.js', 'public/flowers.js'],
   ['/singer-mic.js', 'public/singer-mic.js'],
   ['/singer-layout.js', 'public/singer-layout.js'],
   ['/mobile-controls.js', 'public/mobile-controls.js'],
