@@ -195,7 +195,7 @@ export function buildHall(view,send,me){
  if(privateScreen){
   if(lyricLayoutDirty||!lyricRect){
    const bounds=view.getBoundingClientRect(),chat=document.querySelector('#chat-form').getBoundingClientRect(),controls=document.querySelector('#singer-controls').getBoundingClientRect(),stick=document.querySelector('#joystick').getBoundingClientRect();
-   lyricRect=singerScreenRect(bounds.width,bounds.height,{chatTop:chat.top-bounds.top,controlsBottom:controls.height&&controls.top-bounds.top<bounds.height/2?controls.bottom-bounds.top:0,joystick:stick.width?{left:stick.left-bounds.left,right:stick.right-bounds.left,top:stick.top-bounds.top}:null});lyricLayoutDirty=false;
+   lyricRect=singerScreenRect(bounds.width,bounds.height,{chatTop:chat.top-bounds.top,chatLeft:chat.left-bounds.left,chatBottom:chat.bottom-bounds.top,desktop:!stick.width,controlsBottom:controls.height&&controls.top-bounds.top<bounds.height/2?controls.bottom-bounds.top:0,joystick:stick.width?{left:stick.left-bounds.left,right:stick.right-bounds.left,top:stick.top-bounds.top}:null});lyricLayoutDirty=false;
   }
   const distance=1.5,height=2*distance*Math.tan(camera.fov*Math.PI/360),scale=height/view.clientHeight,w=lyricRect.width*scale,h=lyricRect.height*scale;
   privateOffset.set((lyricRect.x+lyricRect.width/2-view.clientWidth/2)*scale,(view.clientHeight/2-lyricRect.y-lyricRect.height/2)*scale,-distance).applyQuaternion(camera.quaternion);

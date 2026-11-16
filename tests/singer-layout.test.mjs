@@ -17,3 +17,12 @@ test('lyric screen is centered above chat and clear of singer controls and joyst
  }
  assert.ok(singerScreenRect(1280,560).width>=450,'landscape screen is larger than the old corner preview');
 });
+
+test('desktop lyric screen is enlarged at bottom left, clear of the chat',()=>{
+ for(const [width,height] of [[1280,720],[1528,650],[1920,1080]]){
+  const chatLeft=width/2-220,chatBottom=height-18;
+  const r=singerScreenRect(width,height,{desktop:true,chatLeft,chatBottom});
+  assert.equal(r.x,18);assert.equal(r.y+r.height,chatBottom);
+  assert.ok(r.x+r.width<=chatLeft-18);assert.ok(r.width>=380&&r.width<=420);
+ }
+});
