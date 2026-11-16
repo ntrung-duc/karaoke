@@ -50,7 +50,7 @@ setInterval(()=>{const level=stream?singerMic.level():0;$('#mic-level').value=le
 const sound=$('#sound');
 const output=createAudioOutput({storage:localStorage,getPlayer:()=>ready&&song?player:null,canPlay:()=>!Number.isFinite(song?.pausedAt),getAudio:()=>[...peers.values()].map(e=>e.audio).filter(Boolean),onChange:({muted,label,musicVolume,voiceVolume})=>{for(const [kind,value] of [['music',musicVolume],['voice',voiceVolume]]){$('#'+kind+'-volume').value=value;$('#'+kind+'-volume-value').textContent=value+'%';}sound.querySelector('b').textContent=muted?'🔇':'🔊';sound.querySelector('span').textContent=label;sound.setAttribute('aria-label',label);sound.setAttribute('aria-pressed',String(muted));}});
 const serverClock=createServerClock({send});
-const videoSync=createVideoSync(),voiceDelay=createVoiceDelay(localStorage);
+let videoSync=createVideoSync();const voiceDelay=createVoiceDelay(localStorage);
 const delayPicker=$('#voice-delay');delayPicker.value=voiceDelay.value;$('#voice-delay-value').textContent=voiceDelay.value+' ms';
 delayPicker.oninput=()=>{$('#voice-delay-value').textContent=delayPicker.value+' ms';};
 delayPicker.onchange=()=>{delayPicker.value=voiceDelay.set(delayPicker.value);$('#voice-delay-value').textContent=voiceDelay.value+' ms';sync();};
@@ -162,6 +162,13 @@ window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player
  onAutoplayBlocked:()=>{output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
  onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')
 }})};
+window.addEventListener('karaoke-player-moved',()=>{
+ if(!player)return;
+ const frame=player.getIframe(),parent=frame.parentElement;
+ ready=false;player.destroy();player=null;
+ const target=document.createElement('div');target.id='player';parent.replaceChildren(target);
+ videoSync=createVideoSync();window.onYouTubeIframeAPIReady();
+});
 const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe_api';yt.onerror=()=>notice('Chưa kết nối được YouTube. Kiểm tra mạng để phát bài hát.');setInterval(()=>{if(song)sync()},1000);
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){

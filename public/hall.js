@@ -211,7 +211,7 @@ export function buildHall(view,send,me){
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
  flowers.update(now());animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active&&!privateScreen;singerScreen.hidden=!active||!privateScreen;
- const screenParent=privateScreen?singerScreen:screenElement;if(host.parentElement!==screenParent)screenParent.append(host);host.style.width=privateScreen?'100%':'800px';host.style.height=privateScreen?'100%':'450px';
+ const screenParent=privateScreen?singerScreen:screenElement;if(host.parentElement!==screenParent){const mounted=!!host.querySelector('iframe');screenParent.append(host);if(mounted)window.dispatchEvent(new Event('karaoke-player-moved'));}host.style.pointerEvents=privateScreen?'auto':'none';singerScreen.style.pointerEvents=privateScreen?'auto':'none';host.style.width=privateScreen?'100%':'800px';host.style.height=privateScreen?'100%':'450px';
  host.setAttribute('aria-label',privateScreen?'Màn hình riêng của người hát':'Màn hình phòng hát');
  host.style.outline=privateScreen?'5px solid #bda2f0':'none';
  if(privateScreen){
