@@ -44,6 +44,24 @@ export function buildHall(view,send,me){
  const arrowShape=new T.Shape();arrowShape.moveTo(-.075,.32);arrowShape.lineTo(.075,.32);arrowShape.lineTo(.075,.04);arrowShape.lineTo(.23,.04);arrowShape.lineTo(0,-.24);arrowShape.lineTo(-.23,.04);arrowShape.lineTo(-.075,.04);arrowShape.closePath();
  const seatOutline=new T.Mesh(new T.ShapeGeometry(arrowShape),new T.MeshBasicMaterial({color:'#d5b5ff',side:T.DoubleSide,depthTest:false,depthWrite:false,transparent:true,opacity:1}));seatOutline.visible=false;seatOutline.renderOrder=999;scene.add(seatOutline);
  const tooltip=document.createElement('div');tooltip.id='seat-tooltip';tooltip.setAttribute('role','tooltip');tooltip.hidden=true;document.querySelector('main').append(tooltip);
+ const overhead=new Map(),speech=new Map(),labelPoint=new T.Vector3();
+ function drawOverhead(){
+  let hovered=null;
+  if(hoverPoint&&!drag&&!blocked()){
+   const rect=web.domElement.getBoundingClientRect();pointer.set((hoverPoint[0]-rect.left)/rect.width*2-1,-(hoverPoint[1]-rect.top)/rect.height*2+1);seatRay.setFromCamera(pointer,camera);
+   const hit=seatRay.intersectObjects([...actors.values()].filter(a=>a.body.visible).map(a=>a.body),true)[0];
+   if(hit)for(const [id,a] of actors){let node=hit.object;while(node){if(node===a.body){hovered=id;break;}node=node.parent;}if(hovered)break;}
+  }
+  for(const [id,label] of overhead)if(!actors.has(id)){label.remove();overhead.delete(id);speech.delete(id);}
+  for(const [id,a] of actors){
+   if(speech.get(id)?.until<Date.now())speech.delete(id);
+   const text=speech.get(id)?.text,show=a.body.visible&&(hovered===id||!!text);
+   let label=overhead.get(id);if(!label&&show){label=document.createElement('div');label.className='avatar-overhead';document.querySelector('main').append(label);overhead.set(id,label);}if(!label)continue;
+   label.hidden=!show;if(!show)continue;
+   const content=(a.user?.name||'Guest')+'\n'+(text||'');if(label.dataset.content!==content){label.dataset.content=content;label.replaceChildren();const name=document.createElement('strong');name.textContent=a.user?.name||'Guest';label.append(name);if(text){const bubble=document.createElement('div');bubble.textContent=text;label.append(bubble);}}
+   a.body.getWorldPosition(labelPoint);labelPoint.y+=2.5;labelPoint.project(camera);label.hidden=labelPoint.z>1||labelPoint.z< -1;const rect=web.domElement.getBoundingClientRect();label.style.left=(rect.left+(labelPoint.x+1)*rect.width/2)+'px';label.style.top=(rect.top+(1-labelPoint.y)*rect.height/2)+'px';
+  }
+ }
  let hoverPoint=null,hoverDirty=false;
  function hideSeatHover(){seatOutline.visible=false;tooltip.hidden=true;}
  function pickSeat(x,y){
@@ -103,7 +121,7 @@ export function buildHall(view,send,me){
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
  stopEmote();self.emoteAt=0;self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ const api={owner:null,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();
@@ -203,7 +221,7 @@ export function buildHall(view,send,me){
   }
   Object.assign(singerScreen.style,{left:lyricRect.x+'px',top:lyricRect.y+'px',width:lyricRect.width+'px',height:lyricRect.height+'px'});
  }else{display.position.set(rear.x,rear.y,rear.z+.015);display.rotation.set(0,rear.rot,0);display.scale.set(rear.w/800,rear.h/450,1);}
- web.render(scene,camera);if(active)css.render(overlay,camera);if(hoverDirty)updateSeatHover();
+ drawOverhead();web.render(scene,camera);if(active)css.render(overlay,camera);if(hoverDirty)updateSeatHover();
  if(motionDebug){
   const data=web.domElement.dataset;data.playerX=String(self?.x);data.playerZ=String(self?.z);data.pixelRatio=String(pixelRatio);data.bodyYaw=String(actors.get(me())?.body.rotation.y);
   if(pendingInput){data.inputFrameMs=(performance.now()-pendingInput).toFixed(1);pendingInput=0;}

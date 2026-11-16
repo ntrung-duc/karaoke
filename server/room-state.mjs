@@ -11,8 +11,8 @@ const resetMotion={gait:'idle',movingUntil:0,jumpAt:0,emoteAt:0,emote:'parker'};
 export const tokenDigest=token=>createHash('sha256').update(token).digest('hex');
 export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
-export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);if(value.song?.buffering){if(!Number.isFinite(value.song.pausedAt)&&value.song.duration)value.song.endAt=value.song.start+value.song.duration*1000;delete value.song.buffering;delete value.song.playhead;}return {...emptyRoom(),...value,users:new Map(value.users)};};
-export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song}:null,chat:(room.chat||[]).map(entry=>({...entry})),now,revision:room.revision});
+export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);if(value.song?.buffering){if(!Number.isFinite(value.song.pausedAt)&&value.song.duration)value.song.endAt=value.song.start+value.song.duration*1000;delete value.song.buffering;delete value.song.playhead;}return {...emptyRoom(),...value,chat:(value.chat||[]).slice(-MAX_CHAT_HISTORY),users:new Map(value.users)};};
+export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song}:null,chat:(room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
 export const stateEvent=(room,now)=>({message:snapshot(room,now)});
 
 function advance(room,now){

@@ -8,13 +8,13 @@ export function createChat({send,getId,isOpen,notice}){
   const stick=log.scrollHeight-log.scrollTop-log.clientHeight<70;
   const fragment=document.createDocumentFragment();
   if(!entries.length){const empty=document.createElement('p');empty.className='dim';empty.textContent='Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện!';fragment.append(empty);}
-  for(const entry of entries){
+  for(const entry of [...entries].reverse()){
    const row=document.createElement('article');row.className='chat-message'+(entry.userId===getId()?' own':'');
    const meta=document.createElement('div');meta.className='chat-meta';const name=document.createElement('strong');name.textContent=entry.name;
    const time=document.createElement('time');time.dateTime=new Date(entry.at).toISOString();time.textContent=new Date(entry.at).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
    meta.append(name,time);const text=document.createElement('p');text.textContent=entry.text;row.append(meta,text);fragment.append(row);
   }
-  log.replaceChildren(fragment);if(stick)log.scrollTop=log.scrollHeight;
+  log.replaceChildren(fragment);log.scrollTop=0;
  }
  form.onsubmit=event=>{
   event.preventDefault();const text=input.value.trim();if(!text)return;
@@ -27,7 +27,7 @@ export function createChat({send,getId,isOpen,notice}){
  draw();
  return {
   read,
-  open(){read();log.scrollTop=log.scrollHeight;},
+  open(){read();log.scrollTop=0;},
   connected(on){connected=on;button.disabled=!on;},
   history(messages){
    const recent=messages.slice(-MAX_CHAT_HISTORY);
