@@ -1,6 +1,6 @@
 import {createMicTest} from './mic-test.js';
 
-export function createMicTestPanel({root,toggle,canTest=()=>true,notice=()=>{}}){
+export function createMicTestPanel({root,toggle,canTest=()=>true}){
  const status=root.querySelector('[role="status"]'),meter=root.querySelector('meter'),audio=root.querySelector('audio');
  const start=root.querySelector('[data-mic-start]'),record=root.querySelector('[data-mic-record]');
  const clearAudio=()=>{audio.pause();if(audio.hasAttribute('src')){audio.removeAttribute('src');audio.load();}audio.hidden=true;};
@@ -14,7 +14,7 @@ export function createMicTestPanel({root,toggle,canTest=()=>true,notice=()=>{}})
  function close(){root.hidden=true;toggle.setAttribute('aria-expanded','false');tester.stop();}
  toggle.onclick=()=>{
   if(!root.hidden){close();return;}
-  if(!canTest()){notice('Tắt mic đang phát cho phòng trước khi test mic.');return;}
+  if(!canTest())return;
   root.hidden=false;toggle.setAttribute('aria-expanded','true');tester.start();
  };
  start.onclick=()=>{if(canTest())tester.start();};record.onclick=()=>tester.record();
