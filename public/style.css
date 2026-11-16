@@ -49,6 +49,7 @@ nav{right:calc(18px + env(safe-area-inset-right))}nav button{white-space:normal;
 @media(pointer:coarse),(max-width:800px){
  header{top:calc(6px + env(safe-area-inset-top));height:36px;display:flex;align-items:center}
  #singer-controls{left:auto;right:calc(12px + env(safe-area-inset-right));top:calc(6px + env(safe-area-inset-top));bottom:auto;transform:none;max-width:calc(100vw - 118px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:2px;gap:3px;flex-wrap:nowrap;border-radius:9px}
+ aside{max-height:calc(100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom));top:calc(50px + env(safe-area-inset-top));bottom:auto}
  #singer-controls button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;min-height:30px;padding:3px;flex-shrink:0;border-radius:7px}
  #singer-controls .control-label,#singer-controls #emote-choice{display:none}#singer-controls .control-icon{font-size:17px}#singer-controls .control-icon svg{width:20px;height:20px}
  .room-emote{display:block;margin:14px 0}.room-emote select{width:100%;padding:9px;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;font:inherit}
