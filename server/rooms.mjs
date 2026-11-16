@@ -71,6 +71,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
   const record={client,key,connectionId:randomUUID(),id:null,ready:false,closed:false,buffer:[],revision:0,pending:Promise.resolve(),queued:0,alive:true,moveSlot:null};
   clients.add(record);
   function fail(error){
+   console.warn('Room operation failed',{code:['ROOM_BUSY','STORE_UNAVAILABLE','STORE_CLOSED','ROOM_FULL'].includes(error.message)?error.message:'STORAGE_OPERATION_FAILED'});
    if(client.readyState===WebSocket.OPEN){send(record,{type:'error',message:error.message==='ROOM_FULL'?'Phòng đã đầy.':'Chưa kết nối được máy chủ phòng. Đang thử lại.'});client.close(1013,'Room unavailable');}
   }
   function enqueue(task){
@@ -112,7 +113,8 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
     if(result.snapshot)receive(record,{message:result.snapshot});
    });
   });
-  client.on('close',()=>{
+  client.on('close',(code,reason)=>{
+   console.info('Room socket closed',{code,reason:reason.toString().slice(0,100),queued:record.queued});
    record.closed=true;clearInterval(record.heartbeat);clearTimeout(record.rotation);
    enqueue(async()=>{
     if(record.id)await store.transact(key,room=>disconnectMember(room,record.id,record.connectionId,now(),resumeGraceMs));

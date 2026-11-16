@@ -37,7 +37,7 @@ export function createRedisStore({url,prefix='karaoke:v1'}={}){
  if(!url||!/^rediss?:\/\//.test(url))throw new Error('REDIS_URL must use redis:// or rediss://');
  const options={url,disableOfflineQueue:true,socket:{connectTimeout:5000,reconnectStrategy:attempt=>Math.min(2000,100*2**Math.min(attempt,5))}};
  const client=createClient(options),subscriber=client.duplicate(),unavailable=new Set(),subscriptions=new Map();
- let connecting,closed=false;
+ let connecting,closed=false;const transactions=new Map();
  for(const connection of [client,subscriber]){
   // Do not log connection errors: providers sometimes include credentials in them.
   connection.on('error',()=>{});
@@ -61,6 +61,11 @@ export function createRedisStore({url,prefix='karaoke:v1'}={}){
  return {
   ready,
   async transact(key,mutate){
+   // Serialize this instance's writers per room; CAS still protects other instances.
+   const previousTask=transactions.get(key)||Promise.resolve();let release;
+   const current=new Promise(resolve=>{release=resolve;});transactions.set(key,current);
+   await previousTask;
+   try{
    await ready();
    for(let attempt=0;attempt<24;attempt++){
     const previous=await client.get(roomKey(key)),room=decodeRoom(previous);room.revision++;
@@ -70,6 +75,7 @@ export function createRedisStore({url,prefix='karaoke:v1'}={}){
     await new Promise(resolve=>setTimeout(resolve,Math.min(25,attempt*2)+Math.random()*5));
    }
    throw new Error('ROOM_BUSY');
+   }finally{release();if(transactions.get(key)===current)transactions.delete(key);}
   },
   async subscribe(key,listener){
    await ready();
