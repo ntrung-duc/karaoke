@@ -2,6 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAudioOutput} from '../public/audio-output.js';
 
+test('entering the room enables sound despite an old mute, restores zero levels and respects later manual mute',()=>{
+ const saved=new Map([['rap-muted','1'],['rap-music-volume','0'],['rap-voice-volume','0']]);
+ let plays=0,paused=true;const audio={play(){plays++;return Promise.resolve();}};
+ const output=createAudioOutput({storage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},getPlayer:()=>({setVolume(){},unMute(){},mute(){},playVideo(){throw Error('must not start a paused song');}}),canPlay:()=>!paused,getAudio:()=>[audio]});
+ assert.equal(output.muted,false);output.enable({restoreSilentLevels:true});
+ assert.equal(saved.get('rap-muted'),'0');assert.equal(output.musicVolume,30);assert.equal(output.voiceVolume,100);assert.equal(plays,1);assert.equal(audio.muted,false);
+ output.toggle();assert.equal(output.muted,true);output.apply();assert.equal(audio.muted,true,'room snapshots do not override a new manual mute');
+});
+
 test('music starts at 30 percent and voice at full volume; independent levels survive reload and new peers',()=>{
  const saved=new Map(),storage={getItem:key=>saved.get(key)??null,setItem:(key,value)=>saved.set(key,value)};
  let music=-1,plays=0;const voices=[{muted:false,volume:0}],player={setVolume(value){music=value;},mute(){},unMute(){},playVideo(){plays++;}};

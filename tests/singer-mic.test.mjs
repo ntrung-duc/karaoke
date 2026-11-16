@@ -4,10 +4,10 @@ import {createSingerMic} from '../public/singer-mic.js';
 
 const recording=()=>{const track={stops:0,stop(){this.stops++;},onended:null};return {track,getTracks:()=>[track],getAudioTracks:()=>[track]};};
 
-test('mobile auto opens once per singing turn, respects manual mute and does not auto open on desktop',async()=>{
+test('desktop and mobile auto open once per singing turn and respect manual mute',async()=>{
  let session={key:'one',allowed:true,mobile:false},calls=0,live=0;const audio=recording();
  const mic=createSingerMic({getSession:()=>session,getUserMedia:async()=>{calls++;return audio;},onLive:()=>live++});
- await mic.auto();assert.equal(calls,0);session.mobile=true;await mic.auto();assert.equal(calls,1);assert.equal(live,1);
+ await mic.auto();assert.equal(calls,1);session.mobile=true;await mic.auto();assert.equal(calls,1);assert.equal(live,1);
  await mic.auto();assert.equal(calls,1);mic.stop();assert.equal(audio.track.stops,1);
  await mic.auto();assert.equal(calls,1,'manual mute is retained through room snapshots');
  session={...session,key:'two'};await mic.auto();assert.equal(calls,2);mic.stop();

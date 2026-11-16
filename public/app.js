@@ -176,7 +176,7 @@ profileForm.onsubmit=event=>{
  if(!profileForm.reportValidity())return;
  $('#name').value=name;chosenSkin=skinIndex(Number(skinPicker.value));chosenShirt=shirtColor(shirtPicker.value);
  localStorage.setItem('rap-name',name);localStorage.setItem('rap-skin',String(chosenSkin));localStorage.setItem('rap-shirt',chosenShirt);
- welcome.close();connect();hall?.focus();
+ output.enable({restoreSilentLevels:true});welcome.close();connect();hall?.focus();
 };
 $('#name').addEventListener('input',()=>$('#name').setCustomValidity(''));
 welcome.showModal();

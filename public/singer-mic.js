@@ -15,5 +15,5 @@ export function createSingerMic({getSession,getUserMedia=()=>navigator.mediaDevi
   }catch(error){if(own===generation&&getSession().key===session.key&&getSession().allowed)onError(error);}
   finally{if(own===generation){pending=false;publish();}}
  }
- return {start,stop,auto(){const session=getSession();if(session.mobile&&session.allowed&&session.key&&session.key!==autoKey){autoKey=session.key;return start();}}};
+ return {start,stop,auto(){const session=getSession();if(session.allowed&&session.key&&session.key!==autoKey){autoKey=session.key;return start();}}};
 }
