@@ -7,6 +7,7 @@ export function createSongSearch({send,notice}){
   const text=query.value.trim();if(text.length<2){status.textContent='Nhập ít nhất 2 ký tự để tìm bài.';return;}
   pending=crypto.randomUUID();
   if(!send({type:'search',requestId:pending,query:text,karaoke:document.querySelector('#search-karaoke').checked})){finish();status.textContent='Đang chờ kết nối phòng.';return;}
+  if(globalThis.matchMedia?.('(pointer:coarse),(max-width:800px)').matches)query.blur();
   button.disabled=true;results.setAttribute('aria-busy','true');results.replaceChildren();status.textContent='Đang tìm trên YouTube…';
   timer=setTimeout(()=>{finish();status.textContent='Tìm kiếm hơi lâu. Thử lại hoặc dán liên kết video bên dưới.';},12000);
  };

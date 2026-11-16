@@ -56,3 +56,8 @@ nav{right:calc(18px + env(safe-area-inset-right))}nav button{white-space:normal;
 }
 
 #chat-form #throw-flower{flex:none;width:42px;min-width:42px;padding:5px;font-size:25px;line-height:1;touch-action:manipulation}
+/* Keep iOS from zooming the viewport when focusing small form controls. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+@media(pointer:coarse),(max-width:800px){
+ input:not([type=range]):not([type=color]):not([type=checkbox]),textarea,select,#skin-picker,#singer-controls #emote-choice{font-size:16px}
+}
