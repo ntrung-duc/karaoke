@@ -53,3 +53,5 @@ nav{right:calc(18px + env(safe-area-inset-right))}nav button{white-space:normal;
  #singer-controls .control-label,#singer-controls #emote-choice{display:none}#singer-controls .control-icon{font-size:17px}#singer-controls .control-icon svg{width:20px;height:20px}
  .room-emote{display:block;margin:14px 0}.room-emote select{width:100%;padding:9px;color:#f4f1ff;background:#101019;border:1px solid #494757;border-radius:8px;font:inherit}
 }
+
+#chat-form #throw-flower{flex:none;width:42px;min-width:42px;padding:5px;font-size:25px;line-height:1;touch-action:manipulation}

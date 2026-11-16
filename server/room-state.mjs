@@ -11,7 +11,7 @@ const resetMotion={gait:'idle',movingUntil:0,jumpAt:0,emoteAt:0,emote:'parker'};
 export const tokenDigest=token=>createHash('sha256').update(token).digest('hex');
 export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
-export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);return {...emptyRoom(),...value,users:new Map(value.users)};};
+export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);if(value.song?.buffering){if(!Number.isFinite(value.song.pausedAt)&&value.song.duration)value.song.endAt=value.song.start+value.song.duration*1000;delete value.song.buffering;delete value.song.playhead;}return {...emptyRoom(),...value,users:new Map(value.users)};};
 export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song}:null,chat:(room.chat||[]).map(entry=>({...entry})),now,revision:room.revision});
 export const stateEvent=(room,now)=>({message:snapshot(room,now)});
 
@@ -62,6 +62,17 @@ export function applyMessage(room,id,connectionId,message,now){
  member.expiresAt=now+PRESENCE_MS;
  const data=member.data,singer=room.song?.owner===id;
  switch(message.type){
+  case 'flower':{
+   const singerData=room.users.get(room.song?.owner)?.data;
+   if(!singerData||singer||message.key!==room.song.key)return {events};
+   if(Number.isFinite(member.flowerAt)&&now-member.flowerAt<1200)return {events};
+   member.flowerAt=now;
+   const angle=Math.random()*Math.PI*2,radius=.6+Math.random()*1.1;
+   const end=position(singerData.x+Math.cos(angle)*radius,singerData.z+Math.sin(angle)*radius,true);
+   events.push({message:{type:'flower',id:randomUUID(),key:room.song.key,at:now,
+    from:{x:data.x,y:data.seat>=0?1.45:1.2,z:data.z},to:{...end,y:1.08},revision:room.revision}});
+   return {events};
+  }
   case 'chat':{
    if(typeof message.text!=='string'||message.text.length>MAX_CHAT||typeof message.clientId!=='string'||! /^[\w-]{8,64}$/.test(message.clientId))return {events};
    const text=message.text.trim();if(!text)return {events};
@@ -127,29 +138,15 @@ export function applyMessage(room,id,connectionId,message,now){
   case 'playback':{
    if(!singer||message.key!==room.song.key||typeof message.paused!=='boolean')return {events};
    const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return {events};
-   if(message.paused){room.song.pausedAt=room.song.buffering?room.song.playhead.at:now;delete room.song.endAt;}
+   if(message.paused){room.song.pausedAt=now;delete room.song.endAt;}
    else{room.song.start=room.song.awaitingStart?now:room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
    delete room.song.playhead;delete room.song.buffering;
-   if(!message.paused&&message.sync===true){
-    room.song.playhead={position:Math.max(0,(now-room.song.start)/1000),at:now,state:3,receivedAt:now-1000};room.song.buffering=true;delete room.song.endAt;
-   }
-   break;
-  }
-  case 'playhead':{
-   if(!singer||message.key!==room.song.key||message.video!==room.song.video||Number.isFinite(room.song.pausedAt)||![1,3].includes(message.state)||!Number.isFinite(message.position)||message.position<0||message.position>21600||room.song.duration&&message.position>room.song.duration+1)return {events};
-   const previous=room.song.playhead;
-   if(previous&&now-previous.receivedAt<(previous.state===message.state?900:150))return {events};
-   const at=Number.isFinite(message.sampleAt)?Math.max(now-2000,Math.min(now,message.sampleAt)):now;
-   room.song.playhead={position:message.position,at,state:message.state,receivedAt:now};
-   room.song.buffering=message.state===3;room.song.start=at-message.position*1000;
-   if(room.song.buffering)delete room.song.endAt;
-   else if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;
    break;
   }
   case 'duration':
    if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};
    if(room.song.duration===message.duration)return {events};
-   room.song.duration=message.duration;if(!Number.isFinite(room.song.pausedAt)&&!room.song.buffering)room.song.endAt=room.song.start+message.duration*1000;break;
+   room.song.duration=message.duration;if(!Number.isFinite(room.song.pausedAt))room.song.endAt=room.song.start+message.duration*1000;break;
   case 'mic':if(!singer)return {events};data.mic=!!message.on;break;
   case 'leave':removeMember(room,id,now);break;
   default:return {events};
