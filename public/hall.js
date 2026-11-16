@@ -39,7 +39,7 @@ export function buildHall(view,send,me){
  const focusHall=()=>{if(!welcome.open)web.domElement.focus({preventScroll:true});};
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
- seats.forEach((seat,index)=>seatProxy.setMatrixAt(index,seatMatrix.makeTranslation(seat.x,.9,seat.z+.04)));seatProxy.computeBoundingSphere();seatProxy.updateMatrixWorld(true);
+ seats.forEach((seat,index)=>seatProxy.setMatrixAt(index,seatMatrix.makeTranslation(seat.x,(seat.y||0)+.9,seat.z+.04)));seatProxy.computeBoundingSphere();seatProxy.updateMatrixWorld(true);
  const arrowShape=new T.Shape();arrowShape.moveTo(-.075,.32);arrowShape.lineTo(.075,.32);arrowShape.lineTo(.075,.04);arrowShape.lineTo(.23,.04);arrowShape.lineTo(0,-.24);arrowShape.lineTo(-.23,.04);arrowShape.lineTo(-.075,.04);arrowShape.closePath();
  const seatOutline=new T.Mesh(new T.ShapeGeometry(arrowShape),new T.MeshBasicMaterial({color:'#d5b5ff',side:T.DoubleSide,depthTest:false,depthWrite:false,transparent:true,opacity:1}));seatOutline.visible=false;seatOutline.renderOrder=999;scene.add(seatOutline);
  const tooltip=document.createElement('div');tooltip.id='seat-tooltip';tooltip.setAttribute('role','tooltip');tooltip.hidden=true;document.querySelector('main').append(tooltip);
@@ -56,7 +56,7 @@ export function buildHall(view,send,me){
   hoverDirty=false;if(!hoverPoint||drag||welcome.open){hideSeatHover();return;}
   const index=pickSeat(hoverPoint[0],hoverPoint[1]);if(index===null){hideSeatHover();return;}
   const seat=seats[index],occupant=[...actors.values()].find(a=>a.user?.seat===index)?.user;
-  seatOutline.position.set(seat.x,2.12,seat.z+.04);seatOutline.rotation.set(0,camera.rotation.y,0);seatOutline.material.color.set(occupant&&occupant.id!==me()?'#ffba78':'#d5b5ff');seatOutline.visible=true;
+  seatOutline.position.set(seat.x,(seat.y||0)+2.12,seat.z+.04);seatOutline.rotation.set(0,camera.rotation.y,0);seatOutline.material.color.set(occupant&&occupant.id!==me()?'#ffba78':'#d5b5ff');seatOutline.visible=true;
   tooltip.textContent='Ghế '+(index+1)+' · '+(occupant?(occupant.id===me()?'Bạn đang ngồi':'Đã có người'):'Trống');tooltip.dataset.seat=String(index+1);tooltip.hidden=false;
   tooltip.style.left=Math.max(8,Math.min(innerWidth-190,hoverPoint[0]+14))+'px';tooltip.style.top=Math.max(8,Math.min(innerHeight-44,hoverPoint[1]-36))+'px';
  }
@@ -84,7 +84,7 @@ export function buildHall(view,send,me){
  const target=sitting?0:(u.bodyYaw??(singer?Math.PI:0));
  a.facing=id===me()?target:base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
- a.body.position.y=(singer?1:0)+jump.height;
+ a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:0)+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
  a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);

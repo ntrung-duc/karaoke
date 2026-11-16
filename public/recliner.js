@@ -12,7 +12,7 @@ export function addRecliners(scene,seats){
   const instances=new T.InstancedMesh(geometry,material,seats.length);instances.name='Recliner-'+name;
   instances.castShadow=instances.receiveShadow=true;
   seats.forEach((seat,index)=>{
-   transform.position.set(seat.x+x,y,seat.z+z);transform.rotation.set(rx,0,rz);transform.scale.set(1,1,1);transform.updateMatrix();instances.setMatrixAt(index,transform.matrix);
+   transform.position.set(seat.x+x,(seat.y||0)+y,seat.z+z);transform.rotation.set(rx,0,rz);transform.scale.set(1,1,1);transform.updateMatrix();instances.setMatrixAt(index,transform.matrix);
   });
   instances.instanceMatrix.needsUpdate=true;instances.computeBoundingBox();instances.computeBoundingSphere();scene.add(instances);parts.push(instances);
  }
