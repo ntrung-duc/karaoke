@@ -205,7 +205,17 @@ $('#form').onsubmit=e=>{e.preventDefault();if(!connected)return notice('Đang ch
 $('#emote').onclick=async()=>{const key=song?.key;if(song?.owner!==id||!connected)return;const emote=emoteName($('#emote-choice').value),current=users.find(u=>u.id===id),on=!current?.emoteAt||emoteName(current.emote)!==emote;$('#emote').disabled=$('#emote-choice').disabled=$('#room-emote-choice').disabled=true;try{if(on&&!await hall?.prepareEmote(emote))return;if(song?.key!==key||!connected)return;hall?.emote(on,emote);if(current){current.emoteAt=on?Date.now():0;current.emote=emote;}send({type:'emote',key,on,emote});}catch{notice('Chưa tải được điệu nhảy. Bấm lại để thử.');}finally{$('#emote').disabled=$('#emote-choice').disabled=$('#room-emote-choice').disabled=!connected;}};
 $('#emote-choice').onchange=()=>{$('#room-emote-choice').value=$('#emote-choice').value;emoteControl(users.find(u=>u.id===id));};
 $('#room-emote-choice').onchange=()=>{$('#emote-choice').value=$('#room-emote-choice').value;$('#emote-choice').onchange();};
-$('#pause').onclick=()=>{if(song?.owner!==id)return;const paused=Number.isFinite(song.pausedAt);if(paused)micTest.close();send({type:'playback',key:song.key,paused:!paused});};
+$('#pause').onclick=()=>{
+ if(song?.owner!==id)return;
+ const paused=Number.isFinite(song.pausedAt);
+ if(paused){
+  micTest.close();
+  // Start the iframe directly inside the singer's click. Waiting for the
+  // server state round trip loses the browser's user-activation permission.
+  if(ready&&player){player.seekTo(song.awaitingStart?0:elapsed(),true);player.playVideo();}
+ }else player?.pauseVideo();
+ send({type:'playback',key:song.key,paused:!paused});
+};
 $('#singer-test-mic').onclick=()=>{showPanel('room');if($('#mic-test-panel').hidden)$('#test-mic').click();};
 $('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
 $('#mic').onclick=()=>{if(stream){stopMic();send({type:'mic',on:false});}else singerMic.start();};
