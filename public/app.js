@@ -163,19 +163,22 @@ function sync(){
  if(videoSync.sync({song,id,player,now:serverClock.now(),delayMs:voiceDelay.value,position:singerPosition})){output.apply();return;}
  checkPlayback();
 }
-window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:0,disablekb:1,origin:location.origin},events:{
- onReady:()=>{ready=true;player.getIframe().tabIndex=-1;output.apply();sync();},
- onStateChange:event=>{if(event.data===1||event.data===5)output.apply();sync();},
- onAutoplayBlocked:()=>{videoRecovery.hidden=false;output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
- onError:()=>{videoRecovery.hidden=false;notice('YouTube không phát được video này. Bấm tải lại video hoặc chọn bài khác.');}
-}})};
-function recreateVideo(){
- if(!player)return;
- const frame=player.getIframe(),parent=frame.parentElement;
- ready=false;player.destroy();player=null;
- const target=document.createElement('div');target.id='player';parent.replaceChildren(target);
- videoSync=createVideoSync();window.onYouTubeIframeAPIReady();
+let playerGeneration=0;
+function createVideoPlayer(){
+ if(!hall||!globalThis.YT?.Player)return;
+ const generation=++playerGeneration;ready=false;
+ const old=player;player=null;try{old?.destroy();}catch{}
+ videoSync=createVideoSync();
+ const target=hall.playerTarget();
+ player=new YT.Player(target,{width:'800',height:'450',playerVars:{playsinline:1,controls:0,disablekb:1,origin:location.origin},events:{
+  onReady:event=>{if(generation!==playerGeneration)return;player=event.target;ready=true;player.getIframe().tabIndex=-1;output.apply();sync();},
+  onStateChange:event=>{if(generation!==playerGeneration)return;if(event.data===1||event.data===5)output.apply();sync();},
+  onAutoplayBlocked:()=>{if(generation!==playerGeneration)return;videoRecovery.hidden=false;output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
+  onError:()=>{if(generation!==playerGeneration)return;videoRecovery.hidden=false;notice('YouTube không phát được video này. Bấm tải lại video hoặc chọn bài khác.');}
+ }});
 }
+window.onYouTubeIframeAPIReady=createVideoPlayer;
+function recreateVideo(){createVideoPlayer();}
 window.addEventListener('karaoke-player-moved',recreateVideo);
 videoRecovery.onclick=()=>{if(!song)return;if(!ready||player.getVideoData()?.video_id!==song.video){recreateVideo();return;}output.enable();player.seekTo(Math.max(0,(singerPosition?.key===song.key&&singerPosition.start===song.start&&serverClock.now()-singerPosition.at<6000?singerPosition.position+(singerPosition.state===1?Math.max(0,serverClock.now()-singerPosition.at)/1000:0):elapsed())-(song.owner===id?0:voiceDelay.value/1000)),true);player.playVideo();};
 const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe_api';yt.onerror=()=>notice('Chưa kết nối được YouTube. Kiểm tra mạng để phát bài hát.');setInterval(()=>{if(song)sync()},1000);
@@ -190,7 +193,7 @@ setInterval(()=>{
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
  const old=song;song=m.song;const mine=song?.owner===id;users=m.users;chat.history(m.chat||[]);if(song&&!yt.isConnected)document.head.append(yt);serverClock.observe(m.now);
- const changedTurn=old?.key!==song?.key;if(changedTurn){voiceRetries.clear();candidateBacklog.clear();voiceRequestAt.clear();}const keepMic=stream&&mine&&old?.owner===id;
+ const changedTurn=old?.key!==song?.key;if(changedTurn){singerPosition=null;videoStalledAt=0;lastPositionAt=0;voiceRetries.clear();candidateBacklog.clear();voiceRequestAt.clear();}const keepMic=stream&&mine&&old?.owner===id;
  if(changedTurn&&keepMic){for(const entry of peers.values())closePeer(entry);peers.clear();}
  else if(changedTurn||stream&&!mine||!mine&&!users.find(u=>u.id===song?.owner)?.mic)stopMic();
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){closePeer(e);peers.delete(pid)}

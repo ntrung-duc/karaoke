@@ -92,8 +92,11 @@ export function buildHall(view,send,me){
  function actor(u){
  const avatar=createAvatar(palette[u.color],mat);scene.add(avatar.body);return avatar;
  }
- const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:none';const target=document.createElement('div');target.id='player';host.append(target);const screenElement=document.createElement('div');screenElement.style.cssText='width:800px;height:450px';screenElement.append(host);const display=new CSS3DObject(screenElement);overlay.add(display);
+ const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:none';const screenElement=document.createElement('div');screenElement.style.cssText='width:800px;height:450px';screenElement.append(host);const display=new CSS3DObject(screenElement);overlay.add(display);
  const singerScreen=document.createElement('div');singerScreen.id='singer-screen';singerScreen.hidden=true;document.querySelector('main').append(singerScreen);
+ const privateHost=document.createElement('div');privateHost.style.cssText='width:100%;height:100%;background:#121212;pointer-events:auto';singerScreen.append(privateHost);let playerPrivate=null;
+ function playerTarget(){const privateScreen=!!me()&&api.owner===me();playerPrivate=privateScreen;display.visible=active&&!privateScreen;css.render(overlay,camera);host.replaceChildren();privateHost.replaceChildren();const target=document.createElement('div');target.id='player';(privateScreen?privateHost:host).append(target);return target;}
+
  function pose(u){let a=actors.get(u.id);if(!a){a=actor(u);actors.set(u.id,a)}
  if(!a.user)a.body.position.set(u.x,0,u.z);a.user={...u};}
  function animateActors(dt){for(const [id,a] of actors){
@@ -121,7 +124,7 @@ export function buildHall(view,send,me){
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
  stopEmote();self.emoteAt=0;self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ const api={owner:null,playerTarget,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();
@@ -211,9 +214,7 @@ export function buildHall(view,send,me){
  if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
  flowers.update(now());animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active&&!privateScreen;singerScreen.hidden=!active||!privateScreen;
- const screenParent=privateScreen?singerScreen:screenElement;if(host.parentElement!==screenParent){const mounted=!!host.querySelector('iframe');screenParent.append(host);if(mounted)window.dispatchEvent(new Event('karaoke-player-moved'));}host.style.pointerEvents=privateScreen?'auto':'none';singerScreen.style.pointerEvents=privateScreen?'auto':'none';host.style.width=privateScreen?'100%':'800px';host.style.height=privateScreen?'100%':'450px';
- host.setAttribute('aria-label',privateScreen?'Màn hình riêng của người hát':'Màn hình phòng hát');
- host.style.outline=privateScreen?'5px solid #bda2f0':'none';
+ singerScreen.style.pointerEvents=privateScreen?'auto':'none';
  if(privateScreen){
   if(lyricLayoutDirty||!lyricRect){
    const bounds=view.getBoundingClientRect(),chat=document.querySelector('#chat-form').getBoundingClientRect(),controls=document.querySelector('#singer-controls').getBoundingClientRect(),stick=document.querySelector('#joystick').getBoundingClientRect();
@@ -221,7 +222,7 @@ export function buildHall(view,send,me){
   }
   Object.assign(singerScreen.style,{left:lyricRect.x+'px',top:lyricRect.y+'px',width:lyricRect.width+'px',height:lyricRect.height+'px'});
  }else{display.position.set(rear.x,rear.y,rear.z+.015);display.rotation.set(0,rear.rot,0);display.scale.set(rear.w/800,rear.h/450,1);}
- drawOverhead();web.render(scene,camera);if(active)css.render(overlay,camera);if(hoverDirty)updateSeatHover();
+ drawOverhead();web.render(scene,camera);if(active)css.render(overlay,camera);if(hoverDirty)updateSeatHover();if(playerPrivate!==null&&playerPrivate!==privateScreen){playerPrivate=privateScreen;window.dispatchEvent(new Event('karaoke-player-moved'));}
  if(motionDebug){
   const data=web.domElement.dataset;data.playerX=String(self?.x);data.playerZ=String(self?.z);data.pixelRatio=String(pixelRatio);data.bodyYaw=String(actors.get(me())?.body.rotation.y);
   if(pendingInput){data.inputFrameMs=(performance.now()-pendingInput).toFixed(1);pendingInput=0;}
