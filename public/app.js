@@ -91,9 +91,9 @@ function recoverPeer(other,entry){
  },wait);
 }
 function voiceStatus(){
- const status=$('#voice-status');$('#voice-retry').hidden=!song||song.owner===id;
+ const status=$('#voice-status');$('#voice-retry').hidden=!song||song.owner===id&&!voice.enabled;
  if(!song){status.textContent='Chưa có người hát.';return;}
- if(voice.enabled){const live=voice.status==='connected';status.textContent=song.owner===id?(!stream?'Micro đang tắt.':live?'Mic đang phát cho phòng.':'Đang kết nối micro tới phòng…'):!users.find(u=>u.id===song.owner)?.mic?'Người hát đang tắt mic.':live&&voice.audio.length?'Đã kết nối giọng hát.':voice.status==='error'?'Giọng hát bị gián đoạn. Bấm kết nối lại để thử.':'Đang kết nối giọng hát…';return;}
+ if(voice.enabled){const live=voice.status==='connected';if(voice.error&&!live){status.textContent=voice.error;return;}status.textContent=song.owner===id?(!stream?'Micro đang tắt.':live?'Mic đang phát cho phòng.':'Đang kết nối micro tới phòng…'):!users.find(u=>u.id===song.owner)?.mic?'Người hát đang tắt mic.':live&&voice.audio.length?'Đã kết nối giọng hát.':voice.status==='error'?'Giọng hát bị gián đoạn. Bấm kết nối lại để thử.':'Đang kết nối giọng hát…';return;}
  if(song.owner===id){
   if(!stream){status.textContent=micOpening?'Đang mở micro…':'Micro phát cho phòng đang tắt.';return;}
   const connectedPeers=[...peers.values()].filter(e=>e.pc.connectionState==='connected').length;
