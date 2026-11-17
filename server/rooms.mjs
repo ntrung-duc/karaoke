@@ -134,6 +134,7 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
     }
     if(result.snapshot)receive(record,{message:result.snapshot});
     if(result.queueResult)send(record,result.queueResult);
+    if(result.controlResult)send(record,{...result.controlResult,snapshot:result.snapshot});
    });
   });
   client.on('close',(code,reason)=>{

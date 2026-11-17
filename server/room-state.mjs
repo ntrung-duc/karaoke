@@ -77,7 +77,9 @@ export function applyMessage(room,id,connectionId,message,now){
  if(!member||member.connectionId!==connectionId||member.expiresAt<=now)return {expired:true,events};
  member.expiresAt=now+PRESENCE_MS;
  const data=member.data,singer=room.song?.owner===id;
- if(singer&&room.song?.bowUntil&&['move','jump','emote','playback','mic','duration','next'].includes(message.type))return {events};
+ const controlReply=(accepted,error)=>({events,snapshot:snapshot(room,now),controlResult:{type:'control-result',requestId:message.requestId,accepted,error}});
+ if(singer&&room.song?.bowUntil&&message.type==='playback')return controlReply(false,'Đang chuẩn bị bài tiếp theo.');
+ if(singer&&room.song?.bowUntil&&['move','jump','emote','mic','duration','finish'].includes(message.type))return {events};
  switch(message.type){
   case 'flower':{
    const singerData=room.users.get(room.song?.owner)?.data;
@@ -164,16 +166,19 @@ export function applyMessage(room,id,connectionId,message,now){
    if(!room.song)advance(room,now);
    events.push(stateEvent(room,now));return reply(true,undefined,entry.key);
   }
-  case 'next':
+  case 'finish':
    if(!singer||message.key!==room.song.key)return {events};
    beginBow(room,now);finishPreparation(room,now);break;
+  case 'next':
+   if(!singer||message.key!==room.song?.key)return controlReply(false,'Lượt hát đã thay đổi hoặc bạn không phải người đang hát.');
+   advance(room,now);events.push(stateEvent(room,now));return controlReply(true);
   case 'playback':{
-   if(!singer||message.key!==room.song.key||typeof message.paused!=='boolean')return {events};
-   const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return {events};
+   if(!singer||message.key!==room.song?.key||typeof message.paused!=='boolean')return controlReply(false,'Không điều khiển được lượt hát hiện tại.');
+   const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return controlReply(true);
    if(message.paused){room.song.pausedAt=now;delete room.song.endAt;}
    else{room.song.start=room.song.awaitingStart?now:room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
    delete room.song.playhead;delete room.song.buffering;
-   break;
+   events.push(stateEvent(room,now));return controlReply(true);
   }
   case 'duration':
    if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};

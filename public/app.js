@@ -69,6 +69,20 @@ $('#music-volume-help').hidden=!(/iPhone|iPad|iPod/.test(navigator.userAgent)||n
 sound.onclick=()=>{output.toggle();notice('');};
 for(const kind of ['music','voice'])$('#'+kind+'-volume').oninput=event=>output.setVolume(kind,event.target.value);
 function send(m){return connection?.send(m)}
+const pendingControls=new Map();
+function sendControl(message){
+ const requestId=crypto.randomUUID();
+ if(!send({...message,requestId})){notice('Đang chờ kết nối phòng.');return false;}
+ const timer=setTimeout(()=>{pendingControls.delete(requestId);notice('Máy chủ chưa xác nhận thao tác. Kiểm tra kết nối rồi thử lại.');},10000);
+ pendingControls.set(requestId,timer);return true;
+}
+function receiveControl(message){
+ if(!pendingControls.has(message.requestId))return;
+ clearTimeout(pendingControls.get(message.requestId));pendingControls.delete(message.requestId);
+ if(message.snapshot)render(message.snapshot);
+ if(!message.accepted)notice(message.error||'Máy chủ chưa nhận thao tác.');
+}
+
 let hall;try{hall=buildHall($('#view'),send,()=>id)}catch(e){notice('Trình duyệt cần bật WebGL để xem nhà hát');console.error(e)}
 function stopMic(){singerMic.stop();}
 window.addEventListener('pagehide',()=>{stopMic();voice.close();serverClock.stop();});
@@ -201,7 +215,9 @@ setInterval(()=>{
  }
 },1000);
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
+let renderedStateRevision=0;
 function render(m){
+ if(Number.isInteger(m.revision)){if(m.revision<renderedStateRevision)return;renderedStateRevision=m.revision;}
  const old=song;song=m.song;const mine=song?.owner===id;users=m.users;chat.history(m.chat||[]);if(song&&!yt.isConnected)document.head.append(yt);serverClock.observe(m.now);
  const changedTurn=old?.key!==song?.key;if(changedTurn){preparedKey=null;singerPosition=null;videoStalledAt=0;lastPositionAt=0;voiceRetries.clear();candidateBacklog.clear();voiceRequestAt.clear();}const keepMic=stream&&mine&&old?.owner===id&&!song?.bowUntil;
  if(changedTurn&&keepMic){for(const entry of peers.values())closePeer(entry);peers.clear();}
@@ -223,8 +239,8 @@ function render(m){
 function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
  connection=createConnection({room,
-  onHello(m){preparedKey=null;id=m.id;ice=m.ice;connected=true;voice.configure(m.voiceTransport==='livekit');hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
-  onMessage(m){if(m.type==='queue-result'){songQueue.receive(m);}else if(m.type==='video-position'){singerPosition=m;sync();}else if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);if(m.user.id===id){const user=users.find(u=>u.id===id);if(user){user.emoteAt=m.user.emoteAt;user.emote=m.user.emote;}emoteControl(m.user);$('#emote').setAttribute('aria-pressed',String(!!m.user.emoteAt));}}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
+  onHello(m){preparedKey=null;if(id!==m.id)renderedStateRevision=0;id=m.id;ice=m.ice;connected=true;voice.configure(m.voiceTransport==='livekit');hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
+  onMessage(m){if(m.type==='control-result'){receiveControl(m);}else if(m.type==='queue-result'){songQueue.receive(m);}else if(m.type==='video-position'){singerPosition=m;sync();}else if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);if(m.user.id===id){const user=users.find(u=>u.id===id);if(user){user.emoteAt=m.user.emoteAt;user.emote=m.user.emote;}emoteControl(m.user);$('#emote').setAttribute('aria-pressed',String(!!m.user.emoteAt));}}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
    chat.connected(status==='connected');$('#throw-flower').disabled=status!=='connected';
    if(status==='connected'){serverClock.start();$('#status').textContent='●　Trực tuyến';$('#emote').disabled=$('#pause').disabled=$('#next').disabled=false;updateMicControls();return;}
@@ -252,7 +268,7 @@ $('#pause').onclick=()=>{
   if(next.duration)next.endAt=next.start+next.duration*1000;
  }else{next.pausedAt=now;delete next.endAt;}
  song=next;
- if(!send({type:'playback',key:song.key,paused:!paused})){song=previous;return;}
+ if(!sendControl({type:'playback',key:song.key,paused:!paused})){song=previous;return;}
  controlIcon($('#pause'),paused?'Tạm dừng':'Tiếp tục',paused?'⏸':'▶');
  if(paused){
   // Start the iframe directly inside the singer's click. Waiting for the
@@ -260,7 +276,7 @@ $('#pause').onclick=()=>{
   if(ready&&player){player.seekTo(song.awaitingStart?0:elapsed(),true);player.playVideo();}
  }else player?.pauseVideo();
 };
-$('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>song&&send({type:'next',key:song.key});
+$('#camera').onclick=()=>hall?.camera();$('#sit').onclick=()=>hall?.seat();$('#next').onclick=()=>{if(song?.owner!==id)return;if(sendControl({type:'next',key:song.key}))notice('Đang bỏ qua bài…');};
 $('#mic').onclick=()=>{if(stream){stopMic();send({type:'mic',on:false});}else singerMic.start();};
 $('#singer-mic').onclick=()=>$('#mic').click();
 $('#voice-retry').onclick=()=>{output.enable();if(voice.enabled){voice.retry();return;}if(song?.owner!==id&&song){voiceRetries.delete(song.owner);requestVoice(song.owner,true);}};

@@ -46,7 +46,7 @@ export function createPlaybackMonitor(send,clock=Date.now){
   if(Number.isFinite(song.pausedAt))return;
   const ended=elapsed>=Math.max(0,duration-3)&&player.getPlayerState()===0&&player.getCurrentTime()>=duration-.75;
   if((ended||elapsed>=duration+2&&player.getPlayerState()!==3&&player.getCurrentTime()>=duration-.75)&&(nextAttempt!==song.key||now-nextAt>1500)){
-   nextAttempt=song.key;nextAt=now;send({type:'next',key:song.key});
+   nextAttempt=song.key;nextAt=now;send({type:'finish',key:song.key});
   }
  }};
 }
