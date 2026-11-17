@@ -45,7 +45,7 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
    if(message.revision<record.revision)return;
    record.revision=message.revision;
   }
-  if(message.type==='state')scheduleEnd(record,message.song);
+  if(message.type==='state'){record.song=message.song;scheduleEnd(record,message.song);}
   send(record,message);
  }
  async function subscribe(record){
@@ -88,6 +88,15 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
    if(message.type==='clock'){
     if(record.ready&&record.id&&Number.isSafeInteger(message.seq)&&message.seq>0&&(!record.clockAt||now()-record.clockAt>=100)){
      record.clockAt=now();send(record,{type:'clock',seq:message.seq,serverTime:now()});
+    }
+    return;
+   }
+   // Playback samples are ephemeral: never queue behind Redis movement writes.
+   if(message.type==='video-position'){
+    const song=record.song;
+    if(record.ready&&song?.owner===record.id&&song.key===message.key&&message.start===song.start&&!Number.isFinite(song.pausedAt)&&Number.isFinite(message.position)&&message.position>=0&&message.position<=21600&&[1,2,3].includes(message.state)&&(!record.videoAt||now()-record.videoAt>=500)){
+     record.videoAt=now();const event={message:{type:'video-position',key:song.key,start:song.start,position:message.position,state:message.state,at:now()}};
+     for(const listener of record.channel.clients)if(listener!==record)receive(listener,event);
     }
     return;
    }

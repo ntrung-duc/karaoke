@@ -154,27 +154,39 @@ async function signal(m){
  });
  e.signals=task.catch(()=>{});return task;
 }
+let singerPosition=null,lastPositionAt=0,videoStalledAt=0;
+const videoRecovery=document.createElement('button');videoRecovery.id='video-recovery';videoRecovery.textContent='↻ Bật / tải lại video';videoRecovery.hidden=true;document.querySelector('main').append(videoRecovery);
 const elapsed=()=>songElapsed(song,serverClock.now());
 function checkPlayback(){if(ready&&song)playback.check({song,id,player,elapsed:elapsed()});}
 function sync(){
  if(!ready)return;
- if(videoSync.sync({song,id,player,now:serverClock.now(),delayMs:voiceDelay.value})){output.apply();return;}
+ if(videoSync.sync({song,id,player,now:serverClock.now(),delayMs:voiceDelay.value,position:singerPosition})){output.apply();return;}
  checkPlayback();
 }
 window.onYouTubeIframeAPIReady=()=>{if(!hall)return;player=new YT.Player('player',{width:'800',height:'450',playerVars:{playsinline:1,controls:0,disablekb:1,origin:location.origin},events:{
  onReady:()=>{ready=true;player.getIframe().tabIndex=-1;output.apply();sync();},
  onStateChange:event=>{if(event.data===1||event.data===5)output.apply();sync();},
- onAutoplayBlocked:()=>{output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
- onError:()=>notice('YouTube không phát được video này. Người hát có thể kết thúc lượt và chọn link khác.')
+ onAutoplayBlocked:()=>{videoRecovery.hidden=false;output.block();if(!output.muted)notice('Nhấn Bật âm thanh để bắt đầu nghe.');},
+ onError:()=>{videoRecovery.hidden=false;notice('YouTube không phát được video này. Bấm tải lại video hoặc chọn bài khác.');}
 }})};
-window.addEventListener('karaoke-player-moved',()=>{
+function recreateVideo(){
  if(!player)return;
  const frame=player.getIframe(),parent=frame.parentElement;
  ready=false;player.destroy();player=null;
  const target=document.createElement('div');target.id='player';parent.replaceChildren(target);
  videoSync=createVideoSync();window.onYouTubeIframeAPIReady();
-});
+}
+window.addEventListener('karaoke-player-moved',recreateVideo);
+videoRecovery.onclick=()=>{if(!song)return;if(!ready||player.getVideoData()?.video_id!==song.video){recreateVideo();return;}output.enable();player.seekTo(Math.max(0,(singerPosition?.key===song.key&&singerPosition.start===song.start&&serverClock.now()-singerPosition.at<6000?singerPosition.position+(singerPosition.state===1?Math.max(0,serverClock.now()-singerPosition.at)/1000:0):elapsed())-(song.owner===id?0:voiceDelay.value/1000)),true);player.playVideo();};
 const yt=document.createElement('script');yt.src='https://www.youtube.com/iframe_api';yt.onerror=()=>notice('Chưa kết nối được YouTube. Kiểm tra mạng để phát bài hát.');setInterval(()=>{if(song)sync()},1000);
+setInterval(()=>{
+ if(!song){videoRecovery.hidden=true;videoStalledAt=0;return;}
+ const playing=ready&&player?.getPlayerState()===1;
+ if(playing){videoStalledAt=0;videoRecovery.hidden=true;}else if(!Number.isFinite(song.pausedAt)){if(!videoStalledAt)videoStalledAt=Date.now();if(Date.now()-videoStalledAt>8000)videoRecovery.hidden=false;}
+ if(connected&&ready&&song.owner===id&&!Number.isFinite(song.pausedAt)&&player.getVideoData()?.video_id===song.video&&Date.now()-lastPositionAt>=1500){
+  const state=player.getPlayerState();if([1,2,3].includes(state)){lastPositionAt=Date.now();send({type:'video-position',key:song.key,start:song.start,position:player.getCurrentTime(),state});}
+ }
+},1000);
 function row(parent,str,dim=false){const el=document.createElement('div');el.className='item'+(dim?' dim':'');el.textContent=str;parent.append(el);return el}
 function render(m){
  const old=song;song=m.song;const mine=song?.owner===id;users=m.users;chat.history(m.chat||[]);if(song&&!yt.isConnected)document.head.append(yt);serverClock.observe(m.now);
@@ -199,7 +211,7 @@ function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
  connection=createConnection({room,
   onHello(m){id=m.id;ice=m.ice;connected=true;voice.configure(m.voiceTransport==='livekit');hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
-  onMessage(m){if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);if(m.user.id===id){const user=users.find(u=>u.id===id);if(user){user.emoteAt=m.user.emoteAt;user.emote=m.user.emote;}emoteControl(m.user);$('#emote').setAttribute('aria-pressed',String(!!m.user.emoteAt));}}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
+  onMessage(m){if(m.type==='video-position'){singerPosition=m;sync();}else if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);if(m.user.id===id){const user=users.find(u=>u.id===id);if(user){user.emoteAt=m.user.emoteAt;user.emote=m.user.emote;}emoteControl(m.user);$('#emote').setAttribute('aria-pressed',String(!!m.user.emoteAt));}}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
    chat.connected(status==='connected');$('#throw-flower').disabled=status!=='connected';
    if(status==='connected'){serverClock.start();$('#status').textContent='●　Trực tuyến';$('#emote').disabled=$('#pause').disabled=$('#next').disabled=false;updateMicControls();return;}

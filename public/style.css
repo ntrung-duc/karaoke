@@ -68,3 +68,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .avatar-overhead{position:fixed;z-index:3;transform:translate(-50%,-100%);pointer-events:none;text-align:center;max-width:220px;overflow-wrap:anywhere;font-size:13px;text-shadow:0 1px 3px #000}.avatar-overhead strong{display:block;padding:3px 8px}.avatar-overhead div{background:#171827ed;border:1px solid #c7aff880;border-radius:12px;padding:8px 12px;white-space:pre-wrap;max-height:130px;overflow:hidden}
 
 #singer-screen iframe{pointer-events:auto}
+
+#video-recovery{position:fixed;z-index:5;left:50%;top:60px;transform:translateX(-50%);background:#45365d;border-color:#c7aff8;font-size:14px}
