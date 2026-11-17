@@ -36,7 +36,7 @@ export function buildHall(view,send,me){
  } const actors=new Map(),input=createMovementInput(),keys=input.keys,seatGesture=createSeatGesture();const cameraControls=createCameraControls();let self=null,active=false,last=0,previous=performance.now(),dirty=true,drag=null,eyeYaw=0,eyePitch=0,clockOffset=0,pendingStand=false,walkTo=null;
  const drawer=document.querySelector('#drawer'),welcome=document.querySelector('#welcome-dialog');
  const editing=element=>!!element?.closest('input,textarea,select,[contenteditable="true"]');
- const blocked=()=>!drawer.hidden||welcome.open;
+ const blocked=()=>!drawer.hidden||welcome.open||!!(api.bow&&api.owner===me());
  const focusHall=()=>{if(!welcome.open)web.domElement.focus({preventScroll:true});};
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
@@ -110,7 +110,8 @@ export function buildHall(view,send,me){
  a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z))+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
- a.update(dt,sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000);
+ const bow=singer&&api.bow?Math.sin(Math.PI*Math.min(1,Math.max(0,(now()-api.bow.at)/(api.bow.until-api.bow.at)))):0;
+ a.update(dt,bow?'idle':sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000,bow);
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
  function angle(){web.domElement.dataset.cameraMode=cameraControls.mode;}
@@ -124,7 +125,7 @@ export function buildHall(view,send,me){
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
  stopEmote();self.emoteAt=0;self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,playerTarget,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ const api={owner:null,bow:null,playerTarget,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},bow(song){api.bow=song?.bowUntil?{at:song.bowAt,until:song.bowUntil}:null;},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();

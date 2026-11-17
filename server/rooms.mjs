@@ -14,18 +14,19 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
  const clients=new Set(),channels=new Map();let stopping=false;
  function scheduleEnd(record,song){
   const channel=record.channel;if(!channel)return;
-  const version=song&&!Number.isFinite(song.pausedAt)&&Number.isFinite(song.endAt)?song.key+':'+song.endAt:null;
+  const deadline=song?.bowUntil??(song&&!Number.isFinite(song.pausedAt)?song.endAt:null);
+  const version=song&&Number.isFinite(deadline)?song.key+':'+deadline:null;
   if(channel.endVersion===version)return;
   channel.endVersion=version;clearTimeout(channel.endTimer);
   if(!version)return;
   const expire=()=>{
    if(stopping||!channel.clients.size||channel.endVersion!==version)return;
-   if(song.endAt>now()){channel.endTimer=setTimeout(expire,Math.ceil(song.endAt-now())+5);channel.endTimer.unref?.();return;}
+   if(deadline>now()){channel.endTimer=setTimeout(expire,Math.ceil(deadline-now())+5);channel.endTimer.unref?.();return;}
    store.transact(record.key,room=>finishSong(room,song.key,now())).catch(()=>{
     if(channel.endVersion===version){channel.endTimer=setTimeout(expire,1000);channel.endTimer.unref?.();}
    });
   };
-  channel.endTimer=setTimeout(expire,Math.max(10,song.endAt-now()));channel.endTimer.unref?.();
+  channel.endTimer=setTimeout(expire,Math.max(10,deadline-now()));channel.endTimer.unref?.();
  }
  function send(record,message){
   if(record.client.readyState!==WebSocket.OPEN)return;

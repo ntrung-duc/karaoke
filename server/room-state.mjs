@@ -26,6 +26,13 @@ function advance(room,now){
   Object.assign(room.users.get(room.song.owner).data,{x:0,z:-4,seat:-1,yaw:Math.PI,bodyYaw:Math.PI,pitch:0,...resetMotion});
  }
 }
+function beginBow(room,now){
+ if(!room.song||room.song.bowUntil)return;
+ room.song.bowAt=now;room.song.bowUntil=now+4000;room.song.pausedAt=now;delete room.song.endAt;
+ room.song.upNext=room.queue[0]?{...room.queue[0]}:null;
+ const singer=room.users.get(room.song.owner)?.data;
+ if(singer)Object.assign(singer,{x:0,z:-4,yaw:Math.PI,bodyYaw:Math.PI,pitch:0,mic:false,...resetMotion});
+}
 export function removeMember(room,id,now){
  room.users.delete(id);room.queue=room.queue.filter(song=>song.owner!==id);
  if(room.song?.owner===id)advance(room,now);
@@ -38,8 +45,9 @@ export function expireMembers(room,now){
 export function finishSong(room,key,now){
  const expired=expireMembers(room,now);
  const due=room.song?.key===key&&!Number.isFinite(room.song.pausedAt)&&Number.isFinite(room.song.endAt)&&room.song.endAt<=now;
- if(due)advance(room,now);
- return {events:expired||due?[stateEvent(room,now)]:[]};
+ const bowDone=room.song?.key===key&&Number.isFinite(room.song.bowUntil)&&room.song.bowUntil<=now;
+ if(bowDone)advance(room,now);else if(due)beginBow(room,now);
+ return {events:expired||due||bowDone?[stateEvent(room,now)]:[]};
 }
 export function joinMember(room,{id,connectionId,token,resumeToken},now){
  expireMembers(room,now);
@@ -61,6 +69,7 @@ export function applyMessage(room,id,connectionId,message,now){
  if(!member||member.connectionId!==connectionId||member.expiresAt<=now)return {expired:true,events};
  member.expiresAt=now+PRESENCE_MS;
  const data=member.data,singer=room.song?.owner===id;
+ if(singer&&room.song?.bowUntil&&['move','jump','emote','playback','mic','duration','next'].includes(message.type))return {events};
  switch(message.type){
   case 'flower':{
    const singerData=room.users.get(room.song?.owner)?.data;
@@ -136,7 +145,7 @@ export function applyMessage(room,id,connectionId,message,now){
    if(!room.song)advance(room,now);break;
   case 'next':
    if(!singer||message.key!==room.song.key)return {events};
-   advance(room,now);break;
+   beginBow(room,now);break;
   case 'playback':{
    if(!singer||message.key!==room.song.key||typeof message.paused!=='boolean')return {events};
    const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return {events};

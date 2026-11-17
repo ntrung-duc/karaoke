@@ -49,7 +49,7 @@ export function createAvatar(){
   if(emoteName(name)==='wolf')return wolfReady??=Promise.all([ready,loadWolfDance()]).then(([,data])=>{if(!disposed)wolf=data;}).catch(error=>{wolfReady=null;throw error;});
   return danceReady??=Promise.all([ready,loadDance()]).then(([,clip])=>{if(!disposed)actions.parker=mixer.clipAction(clip);}).catch(error=>{danceReady=null;throw error;});
  }
- function update(dt,state,yaw=0,pitch=0,immediate=false,emoteElapsed=0){
+ function update(dt,state,yaw=0,pitch=0,immediate=false,emoteElapsed=0,bow=0){
   if(disposed||!mixer)return;time+=Math.min(.1,Math.max(0,dt));
   const seated=state==='sit',jumping=['jump','fall','land'].includes(state);
   if(isEmote(state)&&(state==='wolf'?!wolf:!actions.parker)){prepareDance(state).catch(()=>{});state='idle';}
@@ -84,6 +84,7 @@ export function createAvatar(){
    for(const side of ['L','R']){const leg=parts.get('leg'+side);for(const x of [-.17,.17])for(const z of [-.17,.17]){point.set(x,-.7057,z);leg.localToWorld(point);body.worldToLocal(point);floor=Math.min(floor,point.y);}}
    for(const joint of parts.values())joint.position.y-=floor;
   }
+  if(bow>0){const bend=new T.Quaternion().setFromAxisAngle(new T.Vector3(1,0,0),-.7*bow),pivot=new T.Vector3(0,.7057,0);for(const name of ['torso','head','armL','armR']){const joint=parts.get(name);joint.position.sub(pivot).applyQuaternion(bend).add(pivot);joint.quaternion.premultiply(bend);}}
   lookQ.setFromEuler(new T.Euler(-pitch,yaw,0,'YXZ'));head.quaternion.multiply(lookQ);
  }
  return {body,head,ready,prepareDance,update,get state(){return current;},
