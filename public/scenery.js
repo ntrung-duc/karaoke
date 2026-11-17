@@ -57,7 +57,7 @@ export function createScenery(scene,box,mat){
  function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
  // Raise the audience screen above the singer and in front of the upper beam.
  // The continuous red curtain remains visible in the former screen location.
- const rear=screen(0,8.35,-6.35,8.75,3.7,0);
+ const rear=screen(0,6.0,-6.35,8.75,3.7,0);
  // A microphone on a stand in front of the singer, visible to the audience.
  const microphone=new T.Group();microphone.name='StageMicrophone';microphone.position.set(0,1.02,-2.95);scene.add(microphone);
  function micPart(geometry,color,x,y,z){const mesh=new T.Mesh(geometry,mat(color));mesh.position.set(x,y,z);microphone.add(mesh);return mesh;}
