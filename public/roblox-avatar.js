@@ -54,7 +54,7 @@ export function createAvatar(){
   const seated=state==='sit',jumping=['jump','fall','land'].includes(state);
   if(isEmote(state)&&(state==='wolf'?!wolf:!actions.parker)){prepareDance(state).catch(()=>{});state='idle';}
   setState(seated||jumping?'idle':state,immediate);
-  if(state==='parker'){actions.parker.time=Math.max(0,emoteElapsed)%actions.parker.getClip().duration;mixer.update(0);}else mixer.update(dt);
+  if(state==='parker'){actions.parker.time=Math.max(0,emoteElapsed)%actions.parker.getClip().duration;mixer.update(0);}else if(state!=='idle')mixer.update(dt);
   rig.rotation.y=0;
   for(const [name,joint] of parts){joint.position.fromArray(pivots[name]);joint.quaternion.identity();}
   const torso=parts.get('torso');
@@ -66,6 +66,8 @@ export function createAvatar(){
    }
   }else if(jumping){
    for(const [side,sign] of [['L',1],['R',-1]])parts.get('arm'+side).rotation.x=Math.sin(time*7+sign)*.16;
+  }else if(state==='idle'){
+   // The model's neutral pivots give straight arms and legs with no idle sway.
   }else{
    if(state==='wolf')applyWolfDance(parts,rig,wolf,emoteElapsed);
    else{
