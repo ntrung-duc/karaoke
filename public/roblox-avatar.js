@@ -66,8 +66,15 @@ export function createAvatar(){
     parts.get('leg'+side).position.y=.88;parts.get('leg'+side).rotation.x=1.2;
    }
   }else if(neutral){
-   // Keep straight limbs while standing, moving and jumping; position is
-   // controlled by the hall without adding gait sway to the model.
+   // Swing rigid limbs only in the forward/backward plane, keeping the
+   // torso upright and the jump pose still.
+   if(state.startsWith('walk')||state.startsWith('run')){
+    const swing=Math.sin(time*7)*.32;
+    for(const [side,sign] of [['L',1],['R',-1]]){
+     parts.get('arm'+side).rotation.x=sign*swing;
+     parts.get('leg'+side).rotation.x=-sign*swing;
+    }
+   }
   }else{
    if(state==='wolf')applyWolfDance(parts,rig,wolf,emoteElapsed);
    else{
