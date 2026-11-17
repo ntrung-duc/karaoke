@@ -60,6 +60,8 @@ export function createRedisStore({url,prefix='karaoke:v1'}={}){
  }
  return {
   ready,
+  async loadRoom(key){await ready();return client.get(roomKey(key));},
+  async saveRoom(key,raw){await ready();await client.set(roomKey(key),raw,{EX:86400});},
   async transact(key,mutate){
    // Serialize this instance's writers per room; CAS still protects other instances.
    const previousTask=transactions.get(key)||Promise.resolve();let release;

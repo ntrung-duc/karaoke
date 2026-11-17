@@ -43,7 +43,7 @@ test('ended video polling retries safely and ignores stale events from the previ
  const song={key:'first',owner:'one',video:'abcdefghijk',start:1000};
  const check=(elapsed=9,id='one',s=song)=>monitor.check({song:s,id,player,elapsed});
  check();assert.equal(sent[0].type,'duration');check();assert.equal(sent.length,1);
- state=0;currentTime=10;check(10);assert.equal(sent.at(-1).type,'next');const count=sent.length;
+ state=0;currentTime=10;check(10);assert.equal(sent.at(-1).type,'finish');const count=sent.length;
  check(10);assert.equal(sent.length,count);time+=1600;check(12);assert.equal(sent.at(-1).key,'first');
  const next={...song,key:'second',duration:10};const before=sent.length;check(0,'one',next);assert.equal(sent.length,before,'same-video old ENDED must not skip a new song');
  check(999,'one',{...next,pausedAt:11000});assert.equal(sent.length,before,'paused playback cannot time out');

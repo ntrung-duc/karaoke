@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {randomUUID} from 'node:crypto';
 
 const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
-const source=app.slice(app.indexOf('function closePeer('),app.indexOf('const elapsed='));
+const source=app.slice(app.indexOf('function closePeer('),app.indexOf('let singerPosition='));
 function fixture(){
  const sent=[],timers=[],events=[];
  class Peer{
@@ -17,7 +17,7 @@ function fixture(){
   async setRemoteDescription(value){events.push('sdp-start');await Promise.resolve();this.remoteDescription=value;events.push('sdp-end');}
   async addIceCandidate(){assert.ok(this.remoteDescription);events.push('ice');}
  }
- const context=vm.createContext({RTCPeerConnection:Peer,MediaStream:class{},peers:new Map(),voiceRetries:new Map(),retiredVoices:new Set(),candidateBacklog:new Map(),voiceRequestAt:new Map(),crypto:{randomUUID},song:{key:'one',owner:'singer'},id:'viewer',stream:null,users:[{id:'singer',mic:true},{id:'viewer'}],ice:[],micOpening:false,
+ const context=vm.createContext({voice:{enabled:false},RTCPeerConnection:Peer,MediaStream:class{},peers:new Map(),voiceRetries:new Map(),retiredVoices:new Set(),candidateBacklog:new Map(),voiceRequestAt:new Map(),crypto:{randomUUID},song:{key:'one',owner:'singer'},id:'viewer',stream:null,users:[{id:'singer',mic:true},{id:'viewer'}],ice:[],micOpening:false,
   $:()=>({textContent:''}),send:m=>sent.push(m),notice(){},output:{attach(){},block(){},muted:false},document:{createElement(){return {setAttribute(){},play:()=>Promise.resolve(),pause(){},remove(){}};},body:{append(){}}},setTimeout:fn=>timers.push(fn),clearTimeout(){}});
  vm.runInContext(source+';globalThis.api={link,signal,offer,closePeer};',context);
  return {context,sent,timers,events,api:context.api};
@@ -56,7 +56,7 @@ test('new microphone ICE arriving before its offer cannot contaminate the previo
 
 test('listener can request a fresh offer without recapturing mic, with a rate limit',async()=>{
  const f=fixture();f.context.id='singer';f.context.stream={getTracks:()=>[{}],getAudioTracks:()=>[{label:'Test mic'}]};
- await f.api.offer('viewer');const old=f.context.peers.get('viewer');
+ await f.api.offer('viewer');const old=f.context.peers.get('viewer');old.createdAt-=7000;
  await f.api.signal({from:'viewer',signal:{key:'one',retry:true}});
  const current=f.context.peers.get('viewer');assert.notEqual(current,old);
  await f.api.signal({from:'viewer',signal:{key:'one',retry:true}});assert.equal(f.context.peers.get('viewer'),current);

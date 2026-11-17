@@ -1,20 +1,21 @@
 import {WebSocket} from 'ws';
+import {createLocalRoomStore} from './local-room-store.mjs';
 import {AccessToken,TrackSource} from 'livekit-server-sdk';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
 import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,RESUME_GRACE_MS} from './room-state.mjs';
 import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
 
-// Only socket ownership is local. Room membership, queues, poses and resume
-// tokens live in the store, and committed events reach every subscribed instance.
-export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
- store??=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):createMemoryStore();
+// The configured store owns room state: RAM with Redis checkpoints on a single
+// server, or Redis transactions and Pub/Sub when multiple servers are required.
+export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
+ if(!store){const backend=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):null;store=backend?(stateMode==='local'?createLocalRoomStore(backend):backend):createMemoryStore();}
  const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
  const livekit=!!(livekitUrl&&livekitApiKey&&livekitApiSecret);
  const clients=new Set(),channels=new Map();let stopping=false;
  function scheduleEnd(record,song){
   const channel=record.channel;if(!channel)return;
-  const deadline=song?.bowUntil??(song&&!Number.isFinite(song.pausedAt)?song.endAt:null);
+  const deadline=song&&!Number.isFinite(song.pausedAt)?song.endAt:null;
   const version=song&&Number.isFinite(deadline)?song.key+':'+deadline:null;
   if(channel.endVersion===version)return;
   channel.endVersion=version;clearTimeout(channel.endTimer);
@@ -100,6 +101,13 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
     if(record.ready&&song?.owner===record.id&&song.key===message.key&&message.start===song.start&&!Number.isFinite(song.pausedAt)&&Number.isFinite(message.position)&&message.position>=0&&message.position<=21600&&[1,2,3].includes(message.state)&&(!record.videoAt||now()-record.videoAt>=500)){
      record.videoAt=now();const event={message:{type:'video-position',key:song.key,start:song.start,position:message.position,state:message.state,at:now()}};
      for(const listener of record.channel.clients)if(listener!==record)receive(listener,event);
+     if(!record.progressAt||now()-record.progressAt>=5000){
+      record.progressAt=now();enqueue(async()=>{
+       if(record.closed)return;
+       const result=await store.transact(key,room=>applyMessage(room,record.id,record.connectionId,{...message,type:'video-progress'},now()));
+       if(result.deadline)scheduleEnd(record,result.deadline);
+      });
+     }
     }
     return;
    }

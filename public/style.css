@@ -70,3 +70,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #singer-screen iframe{pointer-events:auto}
 
 #video-recovery{position:fixed;z-index:5;left:50%;top:60px;transform:translateX(-50%);background:#45365d;border-color:#c7aff8;font-size:14px}
+
+#audio-unlock{position:fixed;z-index:6;left:50%;top:calc(48px + env(safe-area-inset-top));transform:translateX(-50%);max-width:calc(100vw - 24px);background:#c7aff8;color:#211833;font-weight:600;font-size:14px;box-shadow:0 4px 18px #0008}body:has(#audio-unlock:not([hidden])) #video-recovery{top:calc(94px + env(safe-area-inset-top))}

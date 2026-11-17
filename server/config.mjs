@@ -9,6 +9,7 @@ export function readConfig(env = process.env) {
     livekitUrl: env.LIVEKIT_URL || undefined,
     livekitApiKey: env.LIVEKIT_API_KEY || undefined,
     livekitApiSecret: env.LIVEKIT_API_SECRET || undefined,
+    stateMode: env.ROOM_STATE_MODE || (env.VERCEL ? 'shared' : 'local'),
     redisUrl: env.REDIS_URL || undefined,
     youtubeApiKey: env.YOUTUBE_API_KEY || undefined,
     redisPrefix: env.REDIS_PREFIX || (env.VERCEL ? `karaoke:v1:${env.VERCEL_ENV||'development'}${env.VERCEL_ENV==='preview'?':'+(env.VERCEL_GIT_COMMIT_REF||'preview'):''}` : 'karaoke:v1'),

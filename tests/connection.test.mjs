@@ -26,6 +26,8 @@ test('reconnect resumes the same tab, rejects old socket events and backs off wh
  sockets[0].receive({type:'hello',id:'obsolete',resumeToken:'wrong'});assert.equal(hello.length,1);
  sockets[1].onclose({code:1013});assert.equal(timers[1].delay,1000);
  timers[1].fn();sockets[2].onopen();sockets[2].receive({type:'hello',id:'same-player',resumeToken:'secret'});
+ sockets[2].receive({type:'state',revision:2});assert.equal(messages.at(-1).revision,2,'restored checkpoint may have a lower revision after restart');
+ sockets[2].receive({type:'state',revision:1});assert.equal(messages.at(-1).revision,2,'stale messages are still rejected within the new socket');
  sockets[2].receive({type:'state',revision:9});assert.equal(messages.at(-1).revision,9);
  sockets[2].onclose({code:4001});timers[2].fn();sockets[3].onopen();
  assert.deepEqual(sockets[3].sent,[{type:'join'}],'a superseded session starts a separate player instead of stealing the session back');

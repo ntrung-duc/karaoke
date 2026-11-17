@@ -18,7 +18,8 @@ export function createConnection({room,onHello,onMessage,onStatus,onError=()=>{}
    if(stopped||socket!==current)return;
    let message;try{message=JSON.parse(event.data);}catch{return;}
    if(message.type==='hello'){
-    if(id!==message.id){revision=0;stateRevision=0;}
+    // New socket is a fresh revision epoch, even when the resume ID survives a restart.
+    revision=0;stateRevision=0;
     id=message.id;saveToken(message.resumeToken);established=true;attempt=0;
     clearTimer(handshakeTimer);
     onHello?.(message);onStatus?.('connected');return;

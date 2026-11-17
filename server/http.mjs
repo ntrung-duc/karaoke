@@ -7,6 +7,7 @@ const files = new Map([
   ['/', 'public/index.html'],
   ['/server-clock.js', 'public/server-clock.js'],
   ['/flowers.js', 'public/flowers.js'],
+  ['/turn-state.js', 'public/turn-state.js'],
   ['/song-queue.js', 'public/song-queue.js'],
   ['/livekit-voice.js', 'public/livekit-voice.js'],
   ['/lib/livekit-client.js', 'node_modules/livekit-client/dist/livekit-client.esm.mjs'],

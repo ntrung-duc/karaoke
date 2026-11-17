@@ -212,7 +212,7 @@ export function buildHall(view,send,me){
   camera.position.y=T.MathUtils.clamp(camera.position.y,.3,10.2);
  }else camera.rotation.set(self.pitch,self.yaw,0,'YXZ');
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
- if(dirty&&(motionChanged||t-last>75)){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
+ if(dirty&&t-last>=100){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
  }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
  flowers.update(now());animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active&&!privateScreen;singerScreen.hidden=!active||!privateScreen;
  singerScreen.style.pointerEvents=privateScreen?'auto':'none';

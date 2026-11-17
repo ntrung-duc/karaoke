@@ -12,13 +12,15 @@ export const tokenDigest=token=>createHash('sha256').update(token).digest('hex')
 export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
 export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);if(value.song?.buffering){if(!Number.isFinite(value.song.pausedAt)&&value.song.duration)value.song.endAt=value.song.start+value.song.duration*1000;delete value.song.buffering;delete value.song.playhead;}return {...emptyRoom(),...value,chat:(value.chat||[]).slice(-MAX_CHAT_HISTORY),users:new Map(value.users)};};
-export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song}:null,chat:(room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
+export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song,phase:room.song.awaitingStart?'ready':Number.isFinite(room.song.pausedAt)?'paused':'playing'}:null,chat:(room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
 export const stateEvent=(room,now)=>({message:snapshot(room,now)});
 
 function advance(room,now){
  const previous=room.users.get(room.song?.owner)?.data;
  if(previous)Object.assign(previous,{x:-5.9,z:-.95,seat:-1,mic:false,yaw:0,bodyYaw:0,pitch:0,...resetMotion});
- room.song=room.queue.shift()||null;
+ room.queue=room.queue.filter(entry=>room.users.has(entry.owner));
+ const index=room.queue.findIndex(entry=>{const member=room.users.get(entry.owner);return member.connectionId&&member.expiresAt>now;});
+ room.song=index<0?null:room.queue.splice(index,1)[0];
  if(room.song){
   room.song.start=now;
   room.song.pausedAt=now;
@@ -26,25 +28,9 @@ function advance(room,now){
   Object.assign(room.users.get(room.song.owner).data,{x:0,z:-4,seat:-1,yaw:Math.PI,bodyYaw:Math.PI,pitch:0,...resetMotion});
  }
 }
-function beginBow(room,now){
- if(!room.song||room.song.bowUntil)return;
- room.song.bowAt=now;room.song.bowUntil=true;room.song.pausedAt=now;delete room.song.endAt;
- room.song.upNext=room.queue[0]?{...room.queue[0]}:null;
- const singer=room.users.get(room.song.owner)?.data;
- if(singer)Object.assign(singer,{x:0,z:-4,yaw:Math.PI,bodyYaw:Math.PI,pitch:0,mic:false,...resetMotion});
-}
-function finishPreparation(room,now){
- if(!room.song?.bowUntil)return false;
- const next=room.queue[0];
- if(room.song.upNext?.key!==next?.key)room.song.upNext=next?{...next}:null;
- if(!next){advance(room,now);return true;}
- const singer=room.users.get(next.owner);
- if(singer?.connectionId&&singer.expiresAt>now&&singer.preparedKey===next.key&&singer.preparedConnection===singer.connectionId){advance(room,now);return true;}
- return false;
-}
 export function removeMember(room,id,now){
  room.users.delete(id);room.queue=room.queue.filter(song=>song.owner!==id);
- if(room.song?.owner===id)advance(room,now);else finishPreparation(room,now);
+ if(room.song?.owner===id)advance(room,now);
 }
 export function expireMembers(room,now){
  const expired=[...room.users].filter(([,u])=>u.expiresAt<=now).map(([id])=>id);
@@ -54,7 +40,7 @@ export function expireMembers(room,now){
 export function finishSong(room,key,now){
  const expired=expireMembers(room,now);
  const due=room.song?.key===key&&!Number.isFinite(room.song.pausedAt)&&Number.isFinite(room.song.endAt)&&room.song.endAt<=now;
- if(due){beginBow(room,now);finishPreparation(room,now);}
+ if(due)advance(room,now);
  return {events:expired||due?[stateEvent(room,now)]:[]};
 }
 export function joinMember(room,{id,connectionId,token,resumeToken},now){
@@ -67,6 +53,7 @@ export function joinMember(room,{id,connectionId,token,resumeToken},now){
   member={data,tokenDigest:tokenDigest(token)};room.users.set(id,member);
  }else token=resumeToken;
  member.connectionId=connectionId;member.expiresAt=now+PRESENCE_MS;
+ if(room.song?.bowUntil){advance(room,now);}else if(!room.song&&room.queue.length)advance(room,now);
  return {id:member.data.id,token,events:[{takeover:{id:member.data.id,connectionId}},stateEvent(room,now)]};
 }
 
@@ -78,8 +65,6 @@ export function applyMessage(room,id,connectionId,message,now){
  member.expiresAt=now+PRESENCE_MS;
  const data=member.data,singer=room.song?.owner===id;
  const controlReply=(accepted,error)=>({events,snapshot:snapshot(room,now),controlResult:{type:'control-result',requestId:message.requestId,accepted,error}});
- if(singer&&room.song?.bowUntil&&message.type==='playback')return controlReply(false,'Đang chuẩn bị bài tiếp theo.');
- if(singer&&room.song?.bowUntil&&['move','jump','emote','mic','duration','finish'].includes(message.type))return {events};
  switch(message.type){
   case 'flower':{
    const singerData=room.users.get(room.song?.owner)?.data;
@@ -103,11 +88,9 @@ export function applyMessage(room,id,connectionId,message,now){
    room.chat.push(entry);if(room.chat.length>MAX_CHAT_HISTORY)room.chat.splice(0,room.chat.length-MAX_CHAT_HISTORY);
    events.push({message:{type:'chat',entry,revision:room.revision}});return {events};
   }
-  case 'video-prepared':
-   if(!room.song?.bowUntil||message.key!==room.queue[0]?.key||room.queue[0]?.owner!==id)return {events};
-   member.preparedKey=message.key;member.preparedConnection=connectionId;finishPreparation(room,now);break;
+  case 'refresh':return {events,snapshot:snapshot(room,now)};
   case 'heartbeat':
-   if(expireMembers(room,now)||finishPreparation(room,now))events.push(stateEvent(room,now));
+   if(expireMembers(room,now))events.push(stateEvent(room,now));
    return {events,snapshot:snapshot(room,now)};
   case 'move':{
    const {x,z,yaw,bodyYaw,pitch,gait}=message;
@@ -168,7 +151,7 @@ export function applyMessage(room,id,connectionId,message,now){
   }
   case 'finish':
    if(!singer||message.key!==room.song.key)return {events};
-   beginBow(room,now);finishPreparation(room,now);break;
+   advance(room,now);break;
   case 'next':
    if(!singer||message.key!==room.song?.key)return controlReply(false,'Lượt hát đã thay đổi hoặc bạn không phải người đang hát.');
    advance(room,now);events.push(stateEvent(room,now));return controlReply(true);
@@ -179,6 +162,11 @@ export function applyMessage(room,id,connectionId,message,now){
    else{room.song.start=room.song.awaitingStart?now:room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
    delete room.song.playhead;delete room.song.buffering;
    events.push(stateEvent(room,now));return controlReply(true);
+  }
+  case 'video-progress':{
+   if(!singer||message.key!==room.song.key||message.start!==room.song.start||Number.isFinite(room.song.pausedAt)||!Number.isFinite(message.position)||message.position<0||message.position>21600||![1,2,3].includes(message.state))return {events};
+   if(room.song.duration)room.song.endAt=Math.max(room.song.endAt||0,now+Math.max(0,room.song.duration-message.position)*1000+2000);
+   return {events,deadline:room.song?{...room.song}:null};
   }
   case 'duration':
    if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};
@@ -195,6 +183,6 @@ export function disconnectMember(room,id,connectionId,now,grace=RESUME_GRACE_MS)
  const member=room.users.get(id);
  if(!member||member.connectionId!==connectionId)return {events:[]};
  if(grace===0||member.expiresAt<=now)removeMember(room,id,now);
- else {member.connectionId=null;member.expiresAt=now+grace;member.data.mic=false;Object.assign(member.data,resetMotion);finishPreparation(room,now);}
+ else {member.connectionId=null;member.expiresAt=now+grace;member.data.mic=false;Object.assign(member.data,resetMotion);}
  return {events:[stateEvent(room,now)]};
 }
