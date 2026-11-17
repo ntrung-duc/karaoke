@@ -1,5 +1,5 @@
 import {WebSocket} from 'ws';
-import {AccessToken} from 'livekit-server-sdk';
+import {AccessToken,TrackSource} from 'livekit-server-sdk';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
 import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,RESUME_GRACE_MS} from './room-state.mjs';
@@ -115,7 +115,8 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
     if(slot.message.type==='voice-session'&&result.voice&&livekit){
      try{
      const voice=result.voice,token=new AccessToken(livekitApiKey,livekitApiSecret,{identity:record.id,ttl:'5m'});
-     token.addGrant({roomJoin:true,room:'karaoke-'+voice.key,canPublish:voice.owner===record.id,canPublishSources:['microphone'],canSubscribe:true,canPublishData:false});
+     const singer=voice.owner===record.id;
+     token.addGrant({roomJoin:true,room:'karaoke-'+voice.key,canPublish:singer,...(singer?{canPublishSources:[TrackSource.MICROPHONE]}:{}),canSubscribe:true,canPublishData:false});
      send(record,{type:'voice-session',key:voice.key,url:livekitUrl,token:await token.toJwt()});
      }catch{send(record,{type:'error',message:'Chưa cấp được kết nối âm thanh. Kiểm tra cấu hình LiveKit trên máy chủ.'});}
     }
