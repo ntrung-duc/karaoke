@@ -15,4 +15,5 @@ for(const [source,target] of [
  const destination=new URL(`lib/${target}`,output);await mkdir(new URL('./',destination),{recursive:true});
  await cp(new URL(`node_modules/three/${source}`,root),destination);
 }
+await cp(new URL('node_modules/livekit-client/dist/livekit-client.esm.mjs',root),new URL('lib/livekit-client.js',output));
 console.log(`Static assets ready: ${fileURLToPath(output)}`);

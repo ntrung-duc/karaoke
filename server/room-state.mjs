@@ -109,6 +109,8 @@ export function applyMessage(room,id,connectionId,message,now){
    {const name=emoteName(message.emote);data.emoteAt=message.on?(data.emoteAt&&emoteName(data.emote)===name?data.emoteAt:now):0;if(message.on)data.emote=name;}
    data.gait='idle';data.movingUntil=0;
    break;
+  case 'voice-session':
+   return {events,voice:room.song&&message.key===room.song.key?{key:room.song.key,owner:room.song.owner}:null};
   case 'signal':
    if(room.users.has(message.to)&&(singer||message.to===room.song?.owner))events.push({to:message.to,message:{type:'signal',from:id,signal:message.signal,revision:room.revision}});
    return {events};

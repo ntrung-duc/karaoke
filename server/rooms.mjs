@@ -1,4 +1,5 @@
 import {WebSocket} from 'ws';
+import {AccessToken} from 'livekit-server-sdk';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
 import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,RESUME_GRACE_MS} from './room-state.mjs';
@@ -6,9 +7,10 @@ import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
 
 // Only socket ownership is local. Room membership, queues, poses and resume
 // tokens live in the store, and committed events reach every subscribed instance.
-export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiKey,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
+export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
  store??=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):createMemoryStore();
  const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
+ const livekit=!!(livekitUrl&&livekitApiKey&&livekitApiSecret);
  const clients=new Set(),channels=new Map();let stopping=false;
  function scheduleEnd(record,song){
   const channel=record.channel;if(!channel)return;
@@ -110,6 +112,13 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
     if(record.moveSlot===slot)record.moveSlot=null;
     const result=await store.transact(key,room=>applyMessage(room,record.id,record.connectionId,slot.message,now()));
     if(result.expired)client.close(4001,'Session expired');
+    if(slot.message.type==='voice-session'&&result.voice&&livekit){
+     try{
+     const voice=result.voice,token=new AccessToken(livekitApiKey,livekitApiSecret,{identity:record.id,ttl:'5m'});
+     token.addGrant({roomJoin:true,room:'karaoke-'+voice.key,canPublish:voice.owner===record.id,canPublishSources:['microphone'],canSubscribe:true,canPublishData:false});
+     send(record,{type:'voice-session',key:voice.key,url:livekitUrl,token:await token.toJwt()});
+     }catch{send(record,{type:'error',message:'Chưa cấp được kết nối âm thanh. Kiểm tra cấu hình LiveKit trên máy chủ.'});}
+    }
     if(result.snapshot)receive(record,{message:result.snapshot});
    });
   });
@@ -130,7 +139,7 @@ export function createRoomService({ice=[],store,redisUrl,redisPrefix,youtubeApiK
    });
    record.id=result.id;
    if(record.closed)return;
-   send(record,{type:'hello',id:result.id,ice,resumeToken:result.token});record.ready=true;
+   send(record,{type:'hello',id:result.id,ice,voiceTransport:livekit?'livekit':'p2p',resumeToken:result.token});record.ready=true;
    receive(record,{message:result.snapshot});for(const event of record.buffer.splice(0))receive(record,event);
    record.heartbeat=setInterval(()=>{
     if(!record.alive){record.missedPongs=(record.missedPongs||0)+1;if(record.missedPongs>=3){client.terminate();return;}}
