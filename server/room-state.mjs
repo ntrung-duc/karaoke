@@ -38,8 +38,8 @@ function finishPreparation(room,now){
  const next=room.queue[0];
  if(room.song.upNext?.key!==next?.key)room.song.upNext=next?{...next}:null;
  if(!next){advance(room,now);return true;}
- const waiting=[...room.users.values()].filter(member=>member.connectionId&&member.expiresAt>now);
- if(waiting.length&&waiting.every(member=>member.preparedKey===next.key&&member.preparedConnection===member.connectionId)){advance(room,now);return true;}
+ const singer=room.users.get(next.owner);
+ if(singer?.connectionId&&singer.expiresAt>now&&singer.preparedKey===next.key&&singer.preparedConnection===singer.connectionId){advance(room,now);return true;}
  return false;
 }
 export function removeMember(room,id,now){
@@ -104,7 +104,7 @@ export function applyMessage(room,id,connectionId,message,now){
    events.push({message:{type:'chat',entry,revision:room.revision}});return {events};
   }
   case 'video-prepared':
-   if(!room.song?.bowUntil||message.key!==room.queue[0]?.key)return {events};
+   if(!room.song?.bowUntil||message.key!==room.queue[0]?.key||room.queue[0]?.owner!==id)return {events};
    member.preparedKey=message.key;member.preparedConnection=connectionId;finishPreparation(room,now);break;
   case 'heartbeat':
    if(expireMembers(room,now)||finishPreparation(room,now))events.push(stateEvent(room,now));

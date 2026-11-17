@@ -176,7 +176,7 @@ const elapsed=()=>songElapsed(song,serverClock.now());
 let preparedKey=null;
 function acknowledgePrepared(){
  const next=song?.bowUntil&&song.upNext;
- if(!connected||!ready||!next||preparedKey===next.key||player.getVideoData()?.video_id!==next.video||![2,5].includes(player.getPlayerState()))return;
+ if(!connected||!ready||!next||next.owner!==id||preparedKey===next.key||player.getVideoData()?.video_id!==next.video||![2,5].includes(player.getPlayerState()))return;
  if(send({type:'video-prepared',key:next.key}))preparedKey=next.key;
 }
 function checkPlayback(){if(ready&&song)playback.check({song,id,player,elapsed:elapsed()});}
