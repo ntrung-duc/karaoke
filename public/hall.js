@@ -110,7 +110,7 @@ export function buildHall(view,send,me){
  a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z))+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
- const bow=singer&&api.bow?Math.sin(Math.PI*Math.min(1,Math.max(0,(now()-api.bow.at)/(api.bow.until-api.bow.at)))):0;
+ const bow=singer&&api.bow?(.5-.5*Math.cos(Math.PI*2*Math.max(0,now()-api.bow.at)/3000)):0;
  a.update(dt,bow?'idle':sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000,bow);
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
