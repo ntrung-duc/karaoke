@@ -42,7 +42,7 @@ export function createScenery(scene,box,mat){
  box(0,6.93,-7.1,14.25,.14,.55,gold);
  for(const x of [-7.1,7.1])box(x,3.9,-6.8,.36,6.25,.65,'#392e2b');
  box(0,6.92,-6.8,14.55,.4,.65,'#392e2b');
- for(let i=0;i<60;i++)box(-7+i*.237,3.83,-7.78+.06*Math.sin(i*1.8),.245,5.74,.17,i%2?'#7a322a':'#944135');
+ for(let i=0;i<60;i++)box(-7+i*.237,3.83,-7.78+.06*Math.sin(i*1.8),.245,5.74,.17,i%2?'#651424':'#8b2035');
  for(const x of [-9.45,9.45])for(let section=0;section<6;section++){
  const z=-5+section*4.15;box(x,4.1,z,.18,4.6,3.94,'#bea487');
  box(x*.99,1.79,z,.08,.055,3.91,'#ffe0a0');
@@ -55,7 +55,9 @@ export function createScenery(scene,box,mat){
  a.textAlign='center';a.fillStyle='#f3d99f';a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
  const poster=new T.MeshBasicMaterial({map:art()}),hole=new T.MeshBasicMaterial({color:0,opacity:0,blending:T.NoBlending,side:T.FrontSide});
  function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
- const rear=screen(0,3.88,-7.45,8.75,3.7,0);
+ // Raise the audience screen above the singer and in front of the upper beam.
+ // The continuous red curtain remains visible in the former screen location.
+ const rear=screen(0,8.35,-6.35,8.75,3.7,0);
  // A microphone on a stand in front of the singer, visible to the audience.
  const microphone=new T.Group();microphone.name='StageMicrophone';microphone.position.set(0,1.02,-2.95);scene.add(microphone);
  function micPart(geometry,color,x,y,z){const mesh=new T.Mesh(geometry,mat(color));mesh.position.set(x,y,z);microphone.add(mesh);return mesh;}
