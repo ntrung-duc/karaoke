@@ -52,9 +52,10 @@ export function createAvatar(){
  function update(dt,state,yaw=0,pitch=0,immediate=false,emoteElapsed=0,bow=0){
   if(disposed||!mixer)return;time+=Math.min(.1,Math.max(0,dt));
   const seated=state==='sit',jumping=['jump','fall','land'].includes(state);
+  const neutral=state==='idle'||jumping||!seated&&!isEmote(state);
   if(isEmote(state)&&(state==='wolf'?!wolf:!actions.parker)){prepareDance(state).catch(()=>{});state='idle';}
   setState(seated||jumping?'idle':state,immediate);
-  if(state==='parker'){actions.parker.time=Math.max(0,emoteElapsed)%actions.parker.getClip().duration;mixer.update(0);}else if(state!=='idle')mixer.update(dt);
+  if(state==='parker'){actions.parker.time=Math.max(0,emoteElapsed)%actions.parker.getClip().duration;mixer.update(0);}else if(!neutral)mixer.update(dt);
   rig.rotation.y=0;
   for(const [name,joint] of parts){joint.position.fromArray(pivots[name]);joint.quaternion.identity();}
   const torso=parts.get('torso');
@@ -64,10 +65,9 @@ export function createAvatar(){
     parts.get('arm'+side).position.y=1.5857;parts.get('arm'+side).rotation.x=1.1;
     parts.get('leg'+side).position.y=.88;parts.get('leg'+side).rotation.x=1.2;
    }
-  }else if(jumping){
-   for(const [side,sign] of [['L',1],['R',-1]])parts.get('arm'+side).rotation.x=Math.sin(time*7+sign)*.16;
-  }else if(state==='idle'){
-   // The model's neutral pivots give straight arms and legs with no idle sway.
+  }else if(neutral){
+   // Keep straight limbs while standing, moving and jumping; position is
+   // controlled by the hall without adding gait sway to the model.
   }else{
    if(state==='wolf')applyWolfDance(parts,rig,wolf,emoteElapsed);
    else{
