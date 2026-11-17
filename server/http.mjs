@@ -30,7 +30,7 @@ const files = new Map([
     .map(file => ['/lib/' + file, 'node_modules/three/examples/jsm/' + file]),
 ]);
 const types = {
-  js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8',
+  js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8',
   json: 'application/json; charset=utf-8', glb: 'model/gltf-binary', png: 'image/png', html: 'text/html; charset=utf-8',
 };
 export async function serveStatic(req, res) {
