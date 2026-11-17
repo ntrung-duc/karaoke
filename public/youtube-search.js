@@ -1,4 +1,4 @@
-export function createSongSearch({send,notice}){
+export function createSongSearch({send,notice,enqueue}){
  const form=document.querySelector('#search-form'),query=document.querySelector('#search-query'),results=document.querySelector('#search-results'),status=document.querySelector('#search-status'),button=form.querySelector('button');
  let pending=null,timer;
  function finish(){pending=null;clearTimeout(timer);button.disabled=false;results.removeAttribute('aria-busy');}
@@ -23,7 +23,7 @@ export function createSongSearch({send,notice}){
    // YouTube snippets encode entities; parse as inert text, never insert markup.
    const text=new DOMParser().parseFromString(item.title,'text/html').documentElement.textContent;
    title.textContent=text;channel.textContent=item.channel;add.type='button';add.textContent='＋ Thêm vào hàng đợi';
-   add.onclick=()=>{if(send({type:'queue',video:item.video,title:text.slice(0,80)})){notice('Đã thêm bài vào hàng đợi.');add.textContent='✓ Đã thêm';add.disabled=true;}else notice('Đang chờ kết nối phòng.');};
+   add.onclick=async()=>{add.disabled=true;add.textContent='Đang đăng ký…';try{await enqueue(item.video,text.slice(0,80));notice('Phòng đã nhận bài hát.');add.textContent='✓ Đã thêm';}catch(error){add.disabled=false;add.textContent='＋ Thêm vào hàng đợi';notice(error.message);}};
    details.append(title,channel,add);card.append(link,details);results.append(card);
   }
  },disconnected(){if(pending){finish();status.textContent='Mất kết nối. Kết nối lại rồi tìm tiếp nhé.';}}};

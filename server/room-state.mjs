@@ -150,10 +150,20 @@ export function applyMessage(room,id,connectionId,message,now){
    else return {events};
    Object.assign(data,resetMotion);
    if(data.seat>=0)Object.assign(data,{bodyYaw:0,yaw:0,pitch:0});break;
-  case 'queue':
-   if(typeof message.video!=='string'||! /^[\w-]{11}$/.test(message.video)||room.queue.length>=MAX_QUEUE)return {events};
-   room.queue.push({owner:id,video:message.video,title:String(message.title||'Bài hát YouTube').slice(0,MAX_TITLE),key:randomUUID()});
-   if(!room.song)advance(room,now);break;
+  case 'queue':{
+   const requestId=typeof message.requestId==='string'&&/^[\w-]{8,64}$/.test(message.requestId)?message.requestId:undefined;
+   const reply=(accepted,error,key)=>({events,snapshot:snapshot(room,now),queueResult:requestId?{type:'queue-result',requestId,accepted,error,key}:null});
+   if(typeof message.video!=='string'||! /^[\w-]{11}$/.test(message.video))return reply(false,'Liên kết video không hợp lệ.');
+   member.queueRequests??=[];
+   const existing=requestId&&member.queueRequests.find(item=>item.requestId===requestId);
+   if(existing)return reply(true,undefined,existing.key);
+   if(room.queue.length>=MAX_QUEUE)return reply(false,'Hàng đợi đã đầy. Hãy đăng ký lại sau.');
+   const entry={owner:id,video:message.video,title:String(message.title||'Bài hát YouTube').slice(0,MAX_TITLE),key:randomUUID()};
+   room.queue.push(entry);
+   if(requestId){member.queueRequests.push({requestId,key:entry.key});member.queueRequests=member.queueRequests.slice(-32);}
+   if(!room.song)advance(room,now);
+   events.push(stateEvent(room,now));return reply(true,undefined,entry.key);
+  }
   case 'next':
    if(!singer||message.key!==room.song.key)return {events};
    beginBow(room,now);finishPreparation(room,now);break;

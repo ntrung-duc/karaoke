@@ -43,8 +43,10 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
   if(event.to&&event.to!==record.id)return;
   const message=event.message;if(!message)return;
   if(Number.isInteger(message.revision)){
-   if(message.revision<record.revision)return;
-   record.revision=message.revision;
+   const floor=message.type==='state'?(record.stateRevision||0):record.revision;
+   if(message.revision<floor)return;
+   if(message.type==='state')record.stateRevision=message.revision;
+   record.revision=Math.max(record.revision,message.revision);
   }
   if(message.type==='state'){record.song=message.song;scheduleEnd(record,message.song);}
   send(record,message);
@@ -131,6 +133,7 @@ export function createRoomService({livekitUrl,livekitApiKey,livekitApiSecret,ice
      }catch{send(record,{type:'error',message:'Chưa cấp được kết nối âm thanh. Kiểm tra cấu hình LiveKit trên máy chủ.'});}
     }
     if(result.snapshot)receive(record,{message:result.snapshot});
+    if(result.queueResult)send(record,result.queueResult);
    });
   });
   client.on('close',(code,reason)=>{

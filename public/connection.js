@@ -4,7 +4,7 @@ export function createConnection({room,onHello,onMessage,onStatus,onError=()=>{}
  const tokenKey='rap-session:'+room;
  const readToken=()=>{try{return storage?.getItem(tokenKey)||undefined;}catch{return undefined;}};
  function saveToken(token){try{if(token)storage?.setItem(tokenKey,token);else storage?.removeItem(tokenKey);}catch{}}
- let socket,timer,handshakeTimer,stopped=false,established=false,attempt=0,revision=0,id;
+ let socket,timer,handshakeTimer,stopped=false,established=false,attempt=0,revision=0,stateRevision=0,id;
  function connect(){
   if(stopped)return;
   onStatus?.(attempt?'reconnecting':'connecting');
@@ -18,14 +18,14 @@ export function createConnection({room,onHello,onMessage,onStatus,onError=()=>{}
    if(stopped||socket!==current)return;
    let message;try{message=JSON.parse(event.data);}catch{return;}
    if(message.type==='hello'){
-    if(id!==message.id)revision=0;
+    if(id!==message.id){revision=0;stateRevision=0;}
     id=message.id;saveToken(message.resumeToken);established=true;attempt=0;
     clearTimer(handshakeTimer);
     onHello?.(message);onStatus?.('connected');return;
    }
    if(!established)return;
    if(message.type==='error'){onError(message.message);return;}
-   if(Number.isInteger(message.revision)){if(message.revision<revision)return;revision=message.revision;}
+   if(Number.isInteger(message.revision)){const floor=message.type==='state'?stateRevision:revision;if(message.revision<floor)return;if(message.type==='state')stateRevision=message.revision;revision=Math.max(revision,message.revision);}
    onMessage?.(message);
   };
   current.onerror=()=>{}; // onclose is the sole retry path.
@@ -34,7 +34,7 @@ export function createConnection({room,onHello,onMessage,onStatus,onError=()=>{}
    established=false;
    console.warn('Karaoke connection closed',{code:event.code,reason:event.reason||'No close reason',clean:event.wasClean});
    clearTimer(handshakeTimer);
-   if(event.code===4001||event.code===1008){saveToken(undefined);revision=0;}
+   if(event.code===4001||event.code===1008){saveToken(undefined);revision=0;stateRevision=0;}
    onStatus?.('reconnecting');clearTimer(timer);
    const delay=Math.min(30000,500*2**Math.min(attempt++,6))*(.8+random()*.4);
    timer=setTimer(connect,delay);
