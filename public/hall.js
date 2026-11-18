@@ -5,13 +5,13 @@ import {CSS3DRenderer,CSS3DObject} from '/lib/css.js';
 import {seats,position,clearSeat,floorHeight} from './layout.js';
 import {createAvatar,loadMotions} from './avatar.js';
 import {jumpPose,displacementGait,WALK_SPEED} from './motion.js';
-import {relativeHeadYaw,faceIndex,skinIndex,shirtColor} from './avatar-settings.js';
+import {relativeHeadYaw} from './avatar-settings.js';
+import {animalId} from './animal-settings.js';
 import {createCameraControls} from './camera-controls.js';
 import {standLocally,reconcilePlayer} from './player-state.js';
 import {createMovementInput,createSeatGesture} from './input.js';
 import {pathToSeat} from './navigation.js';
 import {createRenderBudget} from './render-budget.js';
-import {emoteName} from './emotes.js';
 import {createJoystick,createTouchCamera} from './mobile-controls.js';
 import {singerScreenRect} from './singer-layout.js';
 export function buildHall(view,send,me){
@@ -24,19 +24,20 @@ export function buildHall(view,send,me){
  const cube=new T.BoxGeometry(),materials=new Map(),palette=['#1684bd','#238ab8','#207eb2','#348ec2','#227aa8','#2888b8'];
  function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.79}));return materials.get(c)}
  function box(x,y,z,w,h,d,c,parent=scene){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
- const {rear,poster,hole,spot,shaft,fixture}=createScenery(scene,box,mat);
+ const {rear,poster,hole,spot,shaft,fixture,microphone}=createScenery(scene,box,mat);
  batchStaticBoxes(scene,cube);
  const axis=new T.Vector3(0,1,0),ray=new T.Vector3(),aim=new T.Vector3();
  function focusStage(dt){
   const singer=actors.get(api.owner);
-  aim.set(singer?.body.position.x??0,1.05,singer?.body.position.z??-4.7);
+  microphone.scale.y=Math.max(.25,(singer?.eyeHeight??1.5)/1.48);
+  aim.set(singer?.body.position.x??0,(singer?.body.position.y??1)+(singer?.height??1)*.5,singer?.body.position.z??-4.7);
   spot.target.position.lerp(aim,1-Math.exp(-12*dt));ray.subVectors(spot.position,spot.target.position);
   const length=ray.length();shaft.position.copy(spot.target.position).addScaledVector(ray,.5);
   shaft.scale.set(length*.225,length,length*.225);shaft.quaternion.setFromUnitVectors(axis,ray.normalize());fixture.quaternion.copy(shaft.quaternion);
  } const actors=new Map(),input=createMovementInput(),keys=input.keys,seatGesture=createSeatGesture();const cameraControls=createCameraControls();let self=null,active=false,last=0,previous=performance.now(),dirty=true,drag=null,eyeYaw=0,eyePitch=0,clockOffset=0,pendingStand=false,walkTo=null;
  const drawer=document.querySelector('#drawer'),welcome=document.querySelector('#welcome-dialog');
  const editing=element=>!!element?.closest('input,textarea,select,[contenteditable="true"]');
- const blocked=()=>!drawer.hidden||welcome.open||!!(api.bow&&api.owner===me());
+ const blocked=()=>!drawer.hidden||welcome.open;
  const focusHall=()=>{if(!welcome.open)web.domElement.focus({preventScroll:true});};
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
@@ -59,7 +60,7 @@ export function buildHall(view,send,me){
    let label=overhead.get(id);if(!label&&show){label=document.createElement('div');label.className='avatar-overhead';document.querySelector('main').append(label);overhead.set(id,label);}if(!label)continue;
    label.hidden=!show;if(!show)continue;
    const content=(a.user?.name||'Guest')+'\n'+(text||'');if(label.dataset.content!==content){label.dataset.content=content;label.replaceChildren();const name=document.createElement('strong');name.textContent=a.user?.name||'Guest';label.append(name);if(text){const bubble=document.createElement('div');bubble.textContent=text;label.append(bubble);}}
-   a.body.getWorldPosition(labelPoint);labelPoint.y+=2.5;labelPoint.project(camera);label.hidden=labelPoint.z>1||labelPoint.z< -1;const rect=web.domElement.getBoundingClientRect();label.style.left=(rect.left+(labelPoint.x+1)*rect.width/2)+'px';label.style.top=(rect.top+(1-labelPoint.y)*rect.height/2)+'px';
+   a.body.getWorldPosition(labelPoint);labelPoint.y+=a.height+.18+(a.user?.seat>=0?.79:0);labelPoint.project(camera);label.hidden=labelPoint.z>1||labelPoint.z< -1;const rect=web.domElement.getBoundingClientRect();label.style.left=(rect.left+(labelPoint.x+1)*rect.width/2)+'px';label.style.top=(rect.top+(1-labelPoint.y)*rect.height/2)+'px';
   }
  }
  let hoverPoint=null,hoverDirty=false;
@@ -90,7 +91,7 @@ export function buildHall(view,send,me){
  const now=()=>Date.now()+clockOffset;
  loadMotions().catch(()=>{document.querySelector('#notice').textContent='Chưa tải được chuyển động avatar. Tải lại trang để thử lại.'});
  function actor(u){
- const avatar=createAvatar(palette[u.color],mat);scene.add(avatar.body);return avatar;
+ const avatar=createAvatar(animalId(u.animal));scene.add(avatar.body);return avatar;
  }
  const host=document.createElement('div');host.style.cssText='width:800px;height:450px;background:#121212;pointer-events:none';const screenElement=document.createElement('div');screenElement.style.cssText='width:800px;height:450px';screenElement.append(host);const display=new CSS3DObject(screenElement);overlay.add(display);
  const singerScreen=document.createElement('div');singerScreen.id='singer-screen';singerScreen.hidden=true;document.querySelector('main').append(singerScreen);
@@ -108,10 +109,9 @@ export function buildHall(view,send,me){
  a.facing=id===me()?target:base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
  a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z,u.x))+jump.height;
- const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
- const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
- const bow=singer&&api.bow?(.5-.5*Math.cos(Math.PI*2*Math.max(0,now()-api.bow.at)/3000)):0;
- a.update(dt,bow?'idle':sitting?'sit':jump.state||(moving?u.gait:dancing?emoteName(u.emote):'idle'),look,u.pitch,id===me(),(now()-(u.emoteAt||now()))/1000,bow);
+ a.setAnimal(animalId(u.animal));
+ const look=relativeHeadYaw(u.yaw,a.facing);
+ a.update(dt,sitting?'sit':'idle',look,u.pitch);
  a.body.visible=id!==me()||cameraControls.mode!=='first';
  }}
  function angle(){web.domElement.dataset.cameraMode=cameraControls.mode;}
@@ -119,20 +119,18 @@ export function buildHall(view,send,me){
  function move(dx,dz){if(!self||self.seat>=0)return;const stage=api.owner===me();
  for(const [x,z] of [[self.x+dx,self.z],[null,self.z+dz]]){const p=position(x??self.x,z,stage);if(stage||clearSeat(p.x,p.z))Object.assign(self,p)}dirty=true}
  function stand(){if(standLocally(self)){pendingStand=true;send({type:'seat',index:-1});dirty=true;}}
- let emoteGeneration=0;
- function stopEmote(){emoteGeneration++;if(self?.emoteAt){self.emoteAt=0;send({type:'emote',on:false});}}
  function jump(){if(!self||jumpPose(self.jumpAt,now()).state)return;
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
- stopEmote();self.emoteAt=0;self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,bow:null,playerTarget,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},async prepareEmote(name){const generation=emoteGeneration;await actors.get(me())?.prepareDance(name);return generation===emoteGeneration;},emote(on,name){if(self){self.emoteAt=on?now():0;if(on)self.emote=emoteName(name);}focusHall();},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(face,skin,shirt){if(self){if(face!==undefined){self.face=faceIndex(face);actors.get(me())?.setFace(self.face);}if(skin!==undefined){self.skin=skinIndex(skin);actors.get(me())?.setSkin(self.skin);}if(shirt!==undefined){self.shirt=shirtColor(shirt);actors.get(me())?.setShirt(self.shirt);}}},bow(song){api.bow=song?.bowUntil?{at:song.bowAt,until:song.bowUntil}:null;},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ self.jumpAt=now();dirty=true;send({type:'jump'});}
+ const api={owner:null,playerTarget,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(animal){if(self){self.animal=animalId(animal);actors.get(me())?.setAnimal(self.animal);}},media(on){active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();
  const touchCamera=createTouchCamera();
  const joystick=createJoystick(document.querySelector('#joystick'),{onStart(){
   if(welcome.open||!self)return false;if(!drawer.hidden)document.querySelector('#close').click();
-  focusHall();cancelWalk();stopEmote();input.clear();first();
+  focusHall();cancelWalk();input.clear();first();
  },onMove:(forward,right)=>input.analog(forward,right)});
  function turnCamera(dx,dy){if(cameraControls.mode==='overview'){eyeYaw-=dx;eyePitch=Math.max(-.55,Math.min(.65,eyePitch-dy));}else if(cameraControls.turn(dx,dy,self))dirty=true;}
  function zoomCamera(delta){const previousMode=cameraControls.mode;if(cameraControls.zoom(delta,self))dirty=true;hoverDirty=true;if(previousMode!==cameraControls.mode)angle();}
@@ -170,7 +168,7 @@ export function buildHall(view,send,me){
  },{passive:false});
  window.addEventListener('keydown',e=>{if(blocked()||editing(e.target))return;
  if(e.code==='Space'){if(e.target.closest('button'))return;e.preventDefault();cancelWalk();if(!e.repeat)jump();return;}
- const key=input.press(e);if(!key)return;e.preventDefault();stopEmote();cancelWalk();if(cameraControls.mode==='overview')first();},true);
+ const key=input.press(e);if(!key)return;e.preventDefault();cancelWalk();if(cameraControls.mode==='overview')first();},true);
  window.addEventListener('keyup',e=>input.release(e),true);
  function releaseControls(){joystick.reset();touchCamera.reset();input.clear();cancelWalk();drag=null;hoverPoint=null;hideSeatHover();}
  window.addEventListener('blur',releaseControls);
@@ -199,9 +197,9 @@ export function buildHall(view,send,me){
   }
  }
  const moved=Math.hypot(self.x-oldX,self.z-oldZ)>.00001;
- if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;self.emoteAt=0;}
+ if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;}
  const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,false):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
- const eyeHeight=self.seat>=0?1.80:1.61,orbitHeight=1.05;
+ const avatar=actors.get(me()),eyeHeight=(avatar?.eyeHeight??.8)+(self.seat>=0?.79:0),orbitHeight=(avatar?.height??1)*.55+(self.seat>=0?.79:0);
  const baseY=self.seat>=0?(seats[self.seat]?.y||0):(api.owner===me()?1:floorHeight(self.z,self.x));
   camera.position.set(self.x,baseY+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
  if(cameraControls.mode==='avatar'){

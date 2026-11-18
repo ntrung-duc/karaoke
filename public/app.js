@@ -1,8 +1,8 @@
 import {projectPlayback} from './turn-state.js';
 import {buildHall} from './hall.js';
 import {roomName} from './session.js';
-import {faceIndex,skinIndex,SKINS,shirtColor} from './avatar-settings.js';
-import {createFacePicker} from './faces.js';
+import {createAnimalPreview} from './animal-preview.js';
+import {ANIMALS,animalId} from './animal-settings.js';
 import {createConnection} from './connection.js';
 import {createAudioOutput} from './audio-output.js';
 import {createPlaybackMonitor,songElapsed,createVideoSync,createVoiceDelay} from './playback.js';
@@ -10,11 +10,9 @@ import {createServerClock} from './server-clock.js';
 import {createChat} from './chat.js';
 import {createSongQueue} from './song-queue.js';
 import {createSongSearch} from './youtube-search.js';
-import {EMOTES,emoteName} from './emotes.js';
 import {createSingerMic} from './singer-mic.js';
 import {createLivekitVoice} from './livekit-voice.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
-for(const select of [$('#emote-choice'),$('#room-emote-choice')]){for(const emote of EMOTES){const option=document.createElement('option');option.value=emote.id;option.textContent=emote.name;select.append(option);}select.value='wolf';}
 function controlIcon(button,label,icon){
  const symbol=document.createElement('span');symbol.className='control-icon';symbol.setAttribute('aria-hidden','true');if(typeof icon==='string')symbol.textContent=icon;else symbol.append(icon);
  const text=document.createElement('span');text.className='control-label';text.textContent=label;button.replaceChildren(symbol,text);button.setAttribute('aria-label',label);button.title=label;
@@ -24,23 +22,13 @@ function microphoneIcon(on){
  const shape=document.createElementNS(ns,'path');shape.setAttribute('d','M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5 M5 10v2a7 7 0 0 0 14 0v-2 M12 19v3 M8 22h8');svg.append(shape);
  if(!on){const slash=document.createElementNS(ns,'path');slash.setAttribute('d','M3 3L21 21');slash.setAttribute('stroke','#ff4f63');slash.setAttribute('stroke-width','3');svg.append(slash);}return svg;
 }
-function emoteControl(user){const active=!!user?.emoteAt&&emoteName(user.emote)===emoteName($('#emote-choice').value);controlIcon($('#emote'),active?'Dừng nhảy':'Emote',active?'■':'💃');$('#emote').setAttribute('aria-pressed',String(active));}
-controlIcon($('#next'),'Bỏ qua bài','⏭');controlIcon($('#pause'),'Bắt đầu hát','▶');emoteControl();
+controlIcon($('#next'),'Bỏ qua bài','⏭');controlIcon($('#pause'),'Bắt đầu hát','▶');
 let id='',connection,users=[],song=null,stream=null,ice=[],player=null,ready=false,connected=false;
-let chosenFace=faceIndex(Number(localStorage.getItem('rap-face')||0));
-let chosenSkin=skinIndex(Number(localStorage.getItem('rap-skin')||0));
-let chosenShirt=shirtColor(localStorage.getItem('rap-shirt'));
-const shirtPicker=$('#shirt-picker');shirtPicker.value=chosenShirt;
-shirtPicker.oninput=()=>{chosenShirt=shirtColor(shirtPicker.value);hall?.appearance(undefined,undefined,chosenShirt);};
-shirtPicker.onchange=()=>{chosenShirt=shirtColor(shirtPicker.value);localStorage.setItem('rap-shirt',chosenShirt);hall?.appearance(undefined,undefined,chosenShirt);send({type:'appearance',shirt:chosenShirt});};
-const skinPicker=$('#skin-picker');
-SKINS.forEach((skin,index)=>{const option=document.createElement('option');option.value=index;option.textContent=skin.name;skinPicker.append(option);});
-if(localStorage.getItem('rap-skin')===null){const option=document.createElement('option');option.value='';option.textContent='Chọn màu da';option.disabled=true;option.selected=true;skinPicker.prepend(option);}else skinPicker.value=chosenSkin;
-skinPicker.onchange=()=>{chosenSkin=skinIndex(Number(skinPicker.value));localStorage.setItem('rap-skin',String(chosenSkin));hall?.appearance(undefined,chosenSkin);send({type:'appearance',skin:chosenSkin});};
-const facePicker=createFacePicker($('#face-picker'),face=>{
- chosenFace=face;localStorage.setItem('rap-face',String(face));hall?.appearance(face);send({type:'appearance',face});
-});
-facePicker.select(chosenFace);
+let chosenAnimal=animalId(localStorage.getItem('rap-animal'));
+const animalPicker=$('#animal-picker');let animalPreview;
+for(const animal of ANIMALS){const option=document.createElement('option');option.value=animal.id;option.textContent=animal.icon+' '+animal.name;animalPicker.append(option);}animalPicker.value=chosenAnimal;
+function selectAnimal(value){if(connected)return;chosenAnimal=animalId(value);animalPicker.value=chosenAnimal;localStorage.setItem('rap-animal',chosenAnimal);hall?.appearance(chosenAnimal);animalPreview?.show(chosenAnimal);}
+animalPicker.onchange=()=>selectAnimal(animalPicker.value);
 let noticeTimer;
 const voiceRetries=new Map(),retiredVoices=new Set(),candidateBacklog=new Map(),voiceRequestAt=new Map();
 const peers=new Map(),notice=(text,duration=0)=>{clearTimeout(noticeTimer);$('#notice').textContent=text;if(duration>0)noticeTimer=setTimeout(()=>{if($('#notice').textContent===text)$('#notice').textContent='';},duration);};
@@ -224,9 +212,8 @@ function render(m){
  else if(changedTurn||stream&&!mine||!mine&&!users.find(u=>u.id===song?.owner)?.mic)stopMic();
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){closePeer(e);peers.delete(pid)}
  hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song);const me=users.find(u=>u.id===id);
- facePicker.select(me?.face??chosenFace);
- skinPicker.value=skinIndex(me?.skin??chosenSkin);
- emoteControl(me);$('#emote').setAttribute('aria-pressed',String(!!me?.emoteAt));$('#emote').disabled=!connected;$('#singer-controls').hidden=!mine;$('#listener-voice-volume').hidden=mine;$('#singer-reverb').hidden=!mine;$('#throw-flower').hidden=!song||mine;$('#throw-flower').disabled=!connected;controlIcon($('#pause'),song?.awaitingStart?'Bắt đầu hát':Number.isFinite(song?.pausedAt)?'Tiếp tục':'Tạm dừng',Number.isFinite(song?.pausedAt)?'▶':'⏸');$('#emote').disabled=$('#pause').disabled=$('#next').disabled=!connected;updateMicControls();$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length+(song?1:0);$('#people').replaceChildren();$('#songs').replaceChildren();
+ if(me?.animalChosen){chosenAnimal=animalId(me.animal);localStorage.setItem('rap-animal',chosenAnimal);}
+ $('#singer-controls').hidden=!mine;$('#listener-voice-volume').hidden=mine;$('#singer-reverb').hidden=!mine;$('#throw-flower').hidden=!song||mine;$('#throw-flower').disabled=!connected;controlIcon($('#pause'),song?.awaitingStart?'Bắt đầu hát':Number.isFinite(song?.pausedAt)?'Tiếp tục':'Tạm dừng',Number.isFinite(song?.pausedAt)?'▶':'⏸');$('#pause').disabled=$('#next').disabled=!connected;updateMicControls();$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length+(song?1:0);$('#people').replaceChildren();$('#songs').replaceChildren();
  for(const u of users)row($('#people'),(u.mic?'🎙 ':'●　')+u.name+(u.id===id?' (bạn)':'')+(u.id===song?.owner?' · Trên sân khấu':u.seat>=0?' · Ghế '+(u.seat+1):' · Đang đứng'));
  const ownerName=s=>users.find(u=>u.id===s.owner)?.name||'Khách';
  $('#turn-status').textContent=!song?'Sân khấu đang trống. Chọn bài để đăng ký lượt hát.':mine?(song.awaitingStart?'Đến lượt bạn. Kiểm tra mic rồi bấm Bắt đầu hát.':Number.isFinite(song.pausedAt)?'Bài của bạn đang tạm dừng.':'Bạn đang hát.'):(song.awaitingStart?ownerName(song)+' đang chuẩn bị hát.':Number.isFinite(song.pausedAt)?'Bài hát đang tạm dừng.':ownerName(song)+' đang hát. Bạn có thể đăng ký bài tiếp theo.');
@@ -240,12 +227,12 @@ function render(m){
 function connect(){
  if(!room){$('#status').textContent='Tên phòng không hợp lệ';notice('Tên phòng dùng 1–48 chữ Latin, số, gạch ngang hoặc gạch dưới.');return;}
  connection=createConnection({room,
-  onHello(m){renderedStateRevision=0;id=m.id;ice=m.ice;connected=true;voice.configure(m.voiceTransport==='livekit');hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',face:chosenFace,skin:chosenSkin,shirt:chosenShirt});if(stream)send({type:'mic',on:true});},
-  onMessage(m){if(m.type==='control-result'){receiveControl(m);}else if(m.type==='queue-result'){songQueue.receive(m);}else if(m.type==='video-position'){singerPosition=m;sync();}else if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);if(m.user.id===id){const user=users.find(u=>u.id===id);if(user){user.emoteAt=m.user.emoteAt;user.emote=m.user.emote;}emoteControl(m.user);$('#emote').setAttribute('aria-pressed',String(!!m.user.emoteAt));}}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
+  onHello(m){renderedStateRevision=0;id=m.id;ice=m.ice;connected=true;voice.configure(m.voiceTransport==='livekit');hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',animal:chosenAnimal});if(stream)send({type:'mic',on:true});},
+  onMessage(m){if(m.type==='control-result'){receiveControl(m);}else if(m.type==='queue-result'){songQueue.receive(m);}else if(m.type==='video-position'){singerPosition=m;sync();}else if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
    chat.connected(status==='connected');$('#throw-flower').disabled=status!=='connected';
-   if(status==='connected'){serverClock.start();$('#status').textContent='●　Trực tuyến';$('#emote').disabled=$('#pause').disabled=$('#next').disabled=false;updateMicControls();return;}
-   serverClock.stop();search.disconnected();songQueue.disconnected();for(const timer of pendingControls.values())clearTimeout(timer);pendingControls.clear();playbackIntent=null;song=authoritativeSong;connected=false;updateMicControls();$('#emote').disabled=$('#pause').disabled=$('#next').disabled=true;
+   if(status==='connected'){serverClock.start();$('#status').textContent='●　Trực tuyến';$('#pause').disabled=$('#next').disabled=false;updateMicControls();return;}
+   serverClock.stop();search.disconnected();songQueue.disconnected();for(const timer of pendingControls.values())clearTimeout(timer);pendingControls.clear();playbackIntent=null;song=authoritativeSong;connected=false;updateMicControls();$('#pause').disabled=$('#next').disabled=true;
    // Keep capture and song time across Function rotation. Rebuild peers only
    // after the room acknowledges mic, so listeners see the state before offers.
    if(stream){for(const entry of peers.values())closePeer(entry);peers.clear();}
@@ -255,9 +242,6 @@ function connect(){
 }
 $('#name').value=localStorage.getItem('rap-name')||'';$('#name').onchange=()=>{localStorage.setItem('rap-name',$('#name').value);send({type:'name',value:$('#name').value})};
 $('#form').onsubmit=async e=>{e.preventDefault();if(!connected)return notice('Đang chờ kết nối phòng.');let v;try{const u=new URL($('#url').value.trim());if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(u.hostname))v=u.searchParams.get('v')||u.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/)?.[1];else if(u.hostname==='youtu.be')v=u.pathname.slice(1)}catch{}if(!/^[\w-]{11}$/.test(v||''))return notice('Hãy dán liên kết đến một video YouTube.');const form=e.target,button=form.querySelector('button');button.disabled=true;try{await songQueue.submit(v,$('#title').value.trim()||'Karaoke · '+v);form.reset();notice('Phòng đã nhận bài hát.');}catch(error){notice(error.message);}finally{button.disabled=false;}};
-$('#emote').onclick=async()=>{const key=song?.key;if(song?.owner!==id||!connected)return;const emote=emoteName($('#emote-choice').value),current=users.find(u=>u.id===id),on=!current?.emoteAt||emoteName(current.emote)!==emote;$('#emote').disabled=$('#emote-choice').disabled=$('#room-emote-choice').disabled=true;try{if(on&&!await hall?.prepareEmote(emote))return;if(song?.key!==key||!connected)return;hall?.emote(on,emote);if(current){current.emoteAt=on?Date.now():0;current.emote=emote;}send({type:'emote',key,on,emote});}catch{notice('Chưa tải được điệu nhảy. Bấm lại để thử.');}finally{$('#emote').disabled=$('#emote-choice').disabled=$('#room-emote-choice').disabled=!connected;}};
-$('#emote-choice').onchange=()=>{$('#room-emote-choice').value=$('#emote-choice').value;emoteControl(users.find(u=>u.id===id));};
-$('#room-emote-choice').onchange=()=>{$('#emote-choice').value=$('#room-emote-choice').value;$('#emote-choice').onchange();};
 $('#pause').onclick=()=>{
  if(song?.owner!==id){notice('Chỉ người đang đến lượt hát mới điều khiển được bài.');return;}
  if(playbackIntent){notice('Đang chờ xác nhận thao tác trước.');return;}
@@ -327,9 +311,10 @@ profileForm.onsubmit=event=>{
  event.preventDefault();const name=$('#name').value.trim();
  $('#name').setCustomValidity(name?'':'Hãy nhập tên của bạn.');
  if(!profileForm.reportValidity())return;
- $('#name').value=name;chosenSkin=skinIndex(Number(skinPicker.value));chosenShirt=shirtColor(shirtPicker.value);
- localStorage.setItem('rap-name',name);localStorage.setItem('rap-skin',String(chosenSkin));localStorage.setItem('rap-shirt',chosenShirt);
- output.enable({restoreSilentLevels:true});welcome.close();connect();hall?.focus();
+ $('#name').value=name;selectAnimal(animalPicker.value);
+ localStorage.setItem('rap-name',name);
+ output.enable({restoreSilentLevels:true});welcome.close();animalPreview?.dispose();animalPreview=null;connect();hall?.focus();
 };
 $('#name').addEventListener('input',()=>$('#name').setCustomValidity(''));
+try{animalPreview=createAnimalPreview($('#animal-preview'));animalPreview.show(chosenAnimal);}catch{$('#animal-preview').hidden=true;}
 welcome.showModal();

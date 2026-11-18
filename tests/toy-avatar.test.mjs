@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import * as T from 'three';
-import {createAvatar,loadMotions} from '../public/avatar.js';
+import {createAvatar,loadMotions} from '../public/roblox-avatar.js';
 import {SKINS} from '../public/avatar-settings.js';
 
-test('supplied Roblox model has six independent rigid parts, old walk clips and configurable appearance',async t=>{
+test('archived Roblox model has six independent rigid parts, old walk clips and configurable appearance',async t=>{
  const original=globalThis.fetch;t.after(()=>globalThis.fetch=original);
  globalThis.fetch=async path=>({ok:true,json:async()=>JSON.parse(await readFile(new URL('../public'+path,import.meta.url),'utf8')),arrayBuffer:async()=>{const b=await readFile(new URL('../public'+path,import.meta.url));return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);}});
  const {gltf,clips}=await loadMotions(),bounds=new T.Box3().setFromObject(gltf.scene);

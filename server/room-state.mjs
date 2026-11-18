@@ -3,7 +3,7 @@ import {seats,position,clearSeat,floorHeight} from '../public/layout.js';
 import {gaits,jumpPose} from '../public/motion.js';
 import {MAX_QUEUE,MAX_NAME,MAX_TITLE,MAX_CHAT,MAX_CHAT_HISTORY} from '../public/session.js';
 import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-settings.js';
-import {isEmote,emoteName} from '../public/emotes.js';
+import {animalId,isAnimal} from '../public/animal-settings.js';
 
 export const PRESENCE_MS=60000;
 export const RESUME_GRACE_MS=45000;
@@ -12,7 +12,7 @@ export const tokenDigest=token=>createHash('sha256').update(token).digest('hex')
 export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
 export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);if(value.song?.buffering){if(!Number.isFinite(value.song.pausedAt)&&value.song.duration)value.song.endAt=value.song.start+value.song.duration*1000;delete value.song.buffering;delete value.song.playhead;}return {...emptyRoom(),...value,chat:(value.chat||[]).slice(-MAX_CHAT_HISTORY),users:new Map(value.users)};};
-export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song,phase:room.song.awaitingStart?'ready':Number.isFinite(room.song.pausedAt)?'paused':'playing'}:null,chat:(room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
+export const snapshot=(room,now)=>({type:'state',users:[...room.users.values()].map(u=>({...u.data,animal:animalId(u.data.animal),animalChosen:!!u.animalChosen})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song,phase:room.song.awaitingStart?'ready':Number.isFinite(room.song.pausedAt)?'paused':'playing'}:null,chat:(room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
 export const stateEvent=(room,now)=>({message:snapshot(room,now)});
 
 function advance(room,now){
@@ -49,7 +49,7 @@ export function joinMember(room,{id,connectionId,token,resumeToken},now){
  let member=digest?[...room.users.values()].find(u=>u.tokenDigest===digest):null;
  if(!member){
   if(room.users.size>=80)throw new Error('ROOM_FULL');
-  const data={id,name:'Khách',seat:-1,x:0,z:15,yaw:0,bodyYaw:0,pitch:0,face:0,skin:0,shirt:shirtColor(),color:Math.floor(Math.random()*6),mic:false,...resetMotion};
+  const data={id,animal:'cat',name:'Khách',seat:-1,x:0,z:15,yaw:0,bodyYaw:0,pitch:0,face:0,skin:0,shirt:shirtColor(),color:Math.floor(Math.random()*6),mic:false,...resetMotion};
   member={data,tokenDigest:tokenDigest(token)};room.users.set(id,member);
  }else token=resumeToken;
  member.connectionId=connectionId;member.expiresAt=now+PRESENCE_MS;
@@ -108,12 +108,7 @@ export function applyMessage(room,id,connectionId,message,now){
   case 'jump':
    if(data.seat>=0||jumpPose(data.jumpAt,now).state)return {events};
    data.jumpAt=now;data.emoteAt=0;events.push({message:{type:'pose',user:{...data},revision:room.revision}});return {events};
-  case 'emote':
-   if(!singer||typeof message.on!=='boolean'||message.on&&(message.key!==room.song.key||jumpPose(data.jumpAt,now).state))return {events};
-   if(message.on&&message.emote!==undefined&&!isEmote(message.emote))return {events};
-   {const name=emoteName(message.emote);data.emoteAt=message.on?(data.emoteAt&&emoteName(data.emote)===name?data.emoteAt:now):0;if(message.on)data.emote=name;}
-   data.gait='idle';data.movingUntil=0;
-   break;
+  case 'emote':return {events};
   case 'voice-session':
    return {events,voice:room.song&&message.key===room.song.key?{key:room.song.key,owner:room.song.owner}:null};
   case 'signal':
@@ -121,6 +116,7 @@ export function applyMessage(room,id,connectionId,message,now){
    return {events};
   case 'name':data.name=String(message.value||'Khách').trim().slice(0,MAX_NAME)||'Khách';break;
   case 'appearance':
+   if(message.animal!==undefined){if(!isAnimal(message.animal))return {events};if(member.animalChosen&&data.animal!==message.animal)return {events:[{to:id,message:{type:'error',message:'Bạn không thể đổi loài khi đã vào phòng.'}}]};data.animal=message.animal;member.animalChosen=true;break;}
    if(message.face!==undefined&&!isFace(message.face)||message.skin!==undefined&&!isSkin(message.skin))return {events};
    if(message.shirt!==undefined&&!isShirt(message.shirt))return {events};
    if(message.face===undefined&&message.skin===undefined&&message.shirt===undefined)return {events};
