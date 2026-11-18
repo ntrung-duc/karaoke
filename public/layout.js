@@ -8,7 +8,16 @@ export function position(x,z,stage) {
 export function clearSeat(x,z){return seats.every(s=>Math.abs(s.x-x)>.64 || Math.abs(s.z-z)>.65)}
 
 
-export function floorHeight(z) {
+export const aisles=[{x:0,width:1.65},{x:-8,width:1.5},{x:8,width:1.5}];
+export const aisleSteps=aisles.flatMap(aisle=>Array.from({length:16},(_,index)=>{
+ const row=1+Math.floor(index/4),step=index%4,depth=.225;
+ return {...aisle,z:row*2-.9+(step+.5)*depth,depth,base:row-1,y:row-1+(step+1)*.25};
+}));
+
+export function floorHeight(z,x) {
+  if(Number.isFinite(x))for(const step of aisleSteps){
+    if(Math.abs(x-step.x)<=step.width/2&&z>=step.z-step.depth/2-1e-8&&z<step.z+step.depth/2)return step.y;
+  }
   if (z >= 8) return 4.0;
   if (z >= 6) return 3.0;
   if (z >= 4) return 2.0;

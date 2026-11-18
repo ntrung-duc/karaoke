@@ -107,7 +107,7 @@ export function buildHall(view,send,me){
  const target=sitting?0:(u.bodyYaw??(singer?Math.PI:0));
  a.facing=id===me()?target:base+Math.atan2(Math.sin(target-base),Math.cos(target-base))*(1-Math.exp(-18*dt));a.body.rotation.y=a.facing;
  const blend=id===me()?1:1-Math.exp(-18*dt);a.body.position.x+=(u.x-a.body.position.x)*blend;a.body.position.z+=(u.z-a.body.position.z)*blend;
- a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z))+jump.height;
+ a.body.position.y=(sitting?seats[u.seat]?.y||0:singer?1:floorHeight(u.z,u.x))+jump.height;
  const look=relativeHeadYaw(u.yaw,a.facing);a.setFace(faceIndex(u.face));a.setSkin(skinIndex(u.skin));a.setShirt(shirtColor(u.shirt));
  const dancing=singer&&u.emoteAt&&!sitting&&!moving&&!jump.state;
  const bow=singer&&api.bow?(.5-.5*Math.cos(Math.PI*2*Math.max(0,now()-api.bow.at)/3000)):0;
@@ -202,7 +202,7 @@ export function buildHall(view,send,me){
  if(cameraControls.faceMovement(self,self.x-oldX,self.z-oldZ))dirty=true;if(moved){hoverDirty=true;self.emoteAt=0;}
  const gait=moved?displacementGait(self.x-oldX,self.z-oldZ,self.bodyYaw??0,false):'idle',motionChanged=self.gait!==gait;if(motionChanged)dirty=true;self.gait=gait;self.movingUntil=moved?now()+240:0;
  const eyeHeight=self.seat>=0?1.80:1.61,orbitHeight=1.05;
- const baseY=self.seat>=0?(seats[self.seat]?.y||0):(api.owner===me()?1:floorHeight(self.z));
+ const baseY=self.seat>=0?(seats[self.seat]?.y||0):(api.owner===me()?1:floorHeight(self.z,self.x));
   camera.position.set(self.x,baseY+(cameraControls.mode==='avatar'?orbitHeight:eyeHeight),self.z);
  if(cameraControls.mode==='avatar'){
   const {yaw,pitch,distance}=cameraControls,horizontal=Math.cos(pitch)*distance;

@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {seats} from './layout.js';
+import {seats,aisles,aisleSteps} from './layout.js';
 import {addRecliners} from './recliner.js';
 
 // All architectural boxes are static. Batch them after construction, retaining
@@ -34,7 +34,16 @@ export function createScenery(scene,box,mat){
  for(let z=-6;z<=13;z+=3){box(x*.99,2.9,z,.15,5.8,.11,wood);box(x*.98,3.25,z,.22,.62,.26,'#ffce87')}}
  box(0,.48,-5.25,14,.96,5.7,wood);box(0,.95,-5.25,14,.09,5.7,'#bc9875');box(0,.83,-2.38,14,.06,.05,gold);
  for(const x of [-5.9,5.9])for(let s=0;s<3;s++)box(x,.13*(3-s),-2.22+s*.28,1.8,.26*(3-s),.33,wood);
- for(const x of [-8,0,8]){const width=x===0?1.65:1.5;box(x,.011,5.5,width,.02,14.4,'#796557');for(const sign of [-1,1])box(x+sign*(width/2-.05),.029,5.5,.025,.012,14.4,gold)}
+ const stairEdge=new T.MeshBasicMaterial({color:'#b99361'});
+ for(const step of aisleSteps){
+  box(step.x,(step.base+step.y)/2,step.z,step.width,step.y-step.base,step.depth,'#514653');
+  const edge=box(step.x,step.y+.008,step.z-step.depth/2+.02,step.width-.05,.016,.04,gold);edge.material=stairEdge;
+ }
+ for(const {x,width} of aisles)for(let row=0;row<=4;row++){
+  const front=row===0?-1.7:row*2,back=row===4?12.7:(row+1)*2-.9,len=back-front;
+  box(x,row+.011,(front+back)/2,width,.02,len,'#796557');
+  for(const sign of [-1,1])box(x+sign*(width/2-.05),row+.029,(front+back)/2,.025,.012,len,gold);
+ }
  for(const z of [-.85,11.1])box(0,.026,z,12.2,.024,1.05,'#796557');
  for(const sign of [-1,1]){
  for(let i=0;i<13;i++){const x=sign*(5.04+i*.175),depth=Math.cos(i*1.45)*.14;box(x,3.85,-7+depth,.2,5.8,.32,i%2?'#762138':'#aa3446')}

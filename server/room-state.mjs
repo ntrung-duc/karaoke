@@ -74,7 +74,7 @@ export function applyMessage(room,id,connectionId,message,now){
    const angle=Math.random()*Math.PI*2,radius=.6+Math.random()*1.1;
    const end=position(singerData.x+Math.cos(angle)*radius,singerData.z+Math.sin(angle)*radius,true);
    events.push({message:{type:'flower',id:randomUUID(),key:room.song.key,at:now,
-    from:{x:data.x,y:(data.seat>=0?(seats[data.seat]?.y??0)+1.45:floorHeight(data.z)+1.2),z:data.z},to:{...end,y:1.08},revision:room.revision}});
+    from:{x:data.x,y:(data.seat>=0?(seats[data.seat]?.y??0)+1.45:floorHeight(data.z,data.x)+1.2),z:data.z},to:{...end,y:1.08},revision:room.revision}});
    return {events};
   }
   case 'chat':{
