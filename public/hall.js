@@ -35,10 +35,10 @@ export function buildHall(view,send,me){
   const length=ray.length();shaft.position.copy(spot.target.position).addScaledVector(ray,.5);
   shaft.scale.set(length*.225,length,length*.225);shaft.quaternion.setFromUnitVectors(axis,ray.normalize());fixture.quaternion.copy(shaft.quaternion);
  } const actors=new Map(),input=createMovementInput(),keys=input.keys,seatGesture=createSeatGesture();const cameraControls=createCameraControls();let self=null,active=false,last=0,previous=performance.now(),dirty=true,drag=null,eyeYaw=0,eyePitch=0,clockOffset=0,pendingStand=false,walkTo=null;
- const drawer=document.querySelector('#drawer'),welcome=document.querySelector('#welcome-dialog');
+ const drawer=document.querySelector('#drawer'),welcome=document.querySelector('#welcome-dialog'),help=document.querySelector('#help-dialog');
  const editing=element=>!!element?.closest('input,textarea,select,[contenteditable="true"]');
- const blocked=()=>!drawer.hidden||welcome.open;
- const focusHall=()=>{if(!welcome.open)web.domElement.focus({preventScroll:true});};
+ const blocked=()=>!drawer.hidden||welcome.open||!!help?.open;
+ const focusHall=()=>{if(!welcome.open&&!help?.open)web.domElement.focus({preventScroll:true});};
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
  seats.forEach((seat,index)=>seatProxy.setMatrixAt(index,seatMatrix.makeTranslation(seat.x,(seat.y||0)+.9,seat.z+.04)));seatProxy.computeBoundingSphere();seatProxy.updateMatrixWorld(true);

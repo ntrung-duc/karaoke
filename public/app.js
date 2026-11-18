@@ -307,6 +307,11 @@ if(document.fullscreenEnabled){
 
 const welcome=document.querySelector('#welcome-dialog'),profileForm=document.querySelector('#profile-form');
 welcome.addEventListener('cancel',event=>event.preventDefault());
+const helpDialog=$('#help-dialog');
+$('#help-open').onclick=()=>{showPanel(null);helpDialog.showModal();};
+$('#welcome-help').onclick=()=>helpDialog.showModal();
+for(const id of ['help-close','help-done'])$('#'+id).onclick=()=>helpDialog.close();
+helpDialog.addEventListener('close',()=>{if(!welcome.open)hall?.focus();});
 profileForm.onsubmit=event=>{
  event.preventDefault();const name=$('#name').value.trim();
  $('#name').setCustomValidity(name?'':'Hãy nhập tên của bạn.');
