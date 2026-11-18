@@ -25,6 +25,7 @@ test('desktop lyric screen is enlarged at bottom left, clear of the chat',()=>{
   const chatLeft=width/2-220,chatBottom=height-18;
   const r=singerScreenRect(width,height,{desktop:true,chatLeft,chatBottom});
   assert.equal(r.x,18);assert.equal(r.y+r.height,chatBottom);
-  assert.ok(r.x+r.width<=chatLeft-18);assert.ok(r.width>=380&&r.width<=420);
+  assert.ok(r.x+r.width<=chatLeft-18);assert.ok(r.width>=380&&r.width<=560);
+  if(width>=1528)assert.ok(r.width>480,'larger desktops use the available space for readable lyrics');
  }
 });
