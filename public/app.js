@@ -31,7 +31,7 @@ function selectAnimal(value){if(connected)return;chosenAnimal=animalId(value);an
 animalPicker.onchange=()=>selectAnimal(animalPicker.value);
 let noticeTimer;
 const voiceRetries=new Map(),retiredVoices=new Set(),candidateBacklog=new Map(),voiceRequestAt=new Map();
-const peers=new Map(),notice=(text,duration=0)=>{clearTimeout(noticeTimer);$('#notice').textContent=text;if(duration>0)noticeTimer=setTimeout(()=>{if($('#notice').textContent===text)$('#notice').textContent='';},duration);};
+const peers=new Map(),notice=(text,duration=3000)=>{clearTimeout(noticeTimer);$('#notice').textContent=text;if(duration>0)noticeTimer=setTimeout(()=>{if($('#notice').textContent===text)$('#notice').textContent='';},duration);};
 let micOpening=false;
 const mobileMic=()=>navigator.maxTouchPoints>0&&(matchMedia('(pointer:coarse)').matches||matchMedia('(max-width:800px)').matches);
 function updateMicControls(){for(const button of [$('#mic'),$('#singer-mic')]){button.disabled=!connected||song?.owner!==id||micOpening;controlIcon(button,micOpening?'Đang bật mic…':stream?'Tắt mic':'Bật mic',microphoneIcon(!!stream));button.setAttribute('aria-pressed',String(!!stream));}$('#singer-mic').hidden=!mobileMic();$('#mic-level-panel').hidden=song?.owner!==id;$('#mic-level-status').textContent=micOpening?'Đang mở micro…':stream?'Hãy nói hoặc hát để xem mức âm lượng.':song?.owner===id?'Mic đang tắt.':'Mic sẽ bật khi đến lượt hát.';}
