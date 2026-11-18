@@ -180,6 +180,7 @@ export function buildHall(view,send,me){
  for(const element of [document.querySelector('#chat-form'),document.querySelector('#singer-controls'),document.querySelector('#joystick')])hudObserver.observe(element);
  new ResizeObserver(()=>{const w=view.clientWidth,h=view.clientHeight;web.setSize(w,h);css.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();lyricLayoutDirty=true;}).observe(view);
  function draw(t){requestAnimationFrame(draw);const frameMs=t-previous,dt=Math.min(.1,frameMs/1000);previous=t;
+ const viewFov=cameraControls.mode==='overview'?72:62;if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
  if(!document.hidden){const ratio=renderBudget.sample(frameMs);if(ratio!==pixelRatio){pixelRatio=ratio;web.setPixelRatio(ratio);}}
  if(cameraControls.mode!=='overview'&&self){const controls=!blocked()&&!editing(document.activeElement);
  if(!controls){if(joystick.active)joystick.reset();input.clear();}const movement=input.sample(),f=movement.forward,r=movement.right;
@@ -211,7 +212,7 @@ export function buildHall(view,send,me){
  }else camera.rotation.set(self.pitch,self.yaw,0,'YXZ');
  camera.position.y+=self.seat<0?jumpPose(self.jumpAt,now()).height:0;
  if(dirty&&t-last>=100){const sent=send({type:'move',x:self.x,z:self.z,yaw:self.yaw,bodyYaw:self.bodyYaw,pitch:self.pitch,gait:self.gait});last=t;if(sent)dirty=false}
- }else{camera.position.set(.7,5.35,13.3);camera.rotation.set(-.22+eyePitch,.045+eyeYaw,0,'YXZ')}
+ }else{camera.position.set(0,9.6,15.8);camera.rotation.set(-.48+eyePitch,eyeYaw,0,'YXZ')}
  flowers.update(now());animateActors(dt);focusStage(dt);const privateScreen=!!me()&&api.owner===me();rear.mesh.material=active&&!privateScreen?hole:poster;display.visible=active&&!privateScreen;singerScreen.hidden=!active||!privateScreen;
  singerScreen.style.pointerEvents=privateScreen?'auto':'none';
  if(privateScreen){
