@@ -36,3 +36,14 @@ test('animal selection is validated, locked after entry and preserved across res
  applyMessage(room,'one','s2',{type:'appearance',animal:'dragon'},1400);assert.equal(room.users.get('one').data.animal,'dragon');
  const fresh=emptyRoom();joinMember(fresh,{id:'two',connectionId:'s',token:'t'},1000);applyMessage(fresh,'two','s',{type:'appearance',animal:'wolf'},1100);assert.equal(snapshot(fresh,1100).users[0].animalChosen,false);
 });
+
+ test('large animals compact on seats, dragons fold wings, standing restores original size',()=>{
+ for(const species of ['cow','bear','horse','dragon']){
+  const avatar=createAvatar(species);avatar.update(0,'idle');avatar.body.updateMatrixWorld(true);const standing=new T.Box3().setFromObject(avatar.body),eye=avatar.eyeHeight;
+  avatar.update(0,'sit');avatar.body.updateMatrixWorld(true);const seated=new T.Box3().setFromObject(avatar.body);
+  assert.ok(seated.max.y<1.76,species+' stays below chair back');assert.ok(seated.max.x-seated.min.x<1.15,species+' fits inside chair width');assert.ok(avatar.eyeHeight<eye);assert.ok(avatar.height<=.960001);
+  if(species==='dragon'){assert.equal(avatar.body.getObjectByName('AnimalWingL').rotation.y,-1.15);assert.equal(avatar.body.getObjectByName('AnimalWingR').rotation.y,1.15);}
+  avatar.update(0,'idle');avatar.body.updateMatrixWorld(true);const restored=new T.Box3().setFromObject(avatar.body);assert.ok(restored.max.distanceTo(standing.max)<1e-8);assert.ok(restored.min.distanceTo(standing.min)<1e-8);assert.equal(avatar.eyeHeight,eye);avatar.dispose();
+ }
+ const duck=createAvatar('duck'),height=duck.height;duck.update(0,'sit');assert.equal(duck.height,height);duck.dispose();
+ });

@@ -13,7 +13,7 @@ function bake(group){
 }
 function template(species){
  if(templates.has(species))return templates.get(species);
- const info=animalInfo(species),root=new T.Group(),body=new T.Group(),head=new T.Group();root.add(body,head);
+ const info=animalInfo(species),root=new T.Group(),body=new T.Group(),head=new T.Group(),wings=new T.Group();root.add(body,head,wings);
  const bird=species==='duck'||species==='chicken',cream='#fff0d4',black='#242025',pink='#ed9b9e',brown='#75452d',orange='#ed9635',base=info.color;
  const add=(parent,geometry,color,x,y,z,rx=0,ry=0,rz=0)=>{const mesh=new T.Mesh(geometry,material(color));mesh.position.set(x,y,z);mesh.rotation.set(rx,ry,rz);parent.add(mesh);return mesh;};
  const box=(parent,w,h,d,r,color,x,y,z,rx=0,ry=0,rz=0)=>add(parent,roundedBox(w,h,d,Math.min(r,w/2,h/2,d/2)),color,x,y,z,rx,ry,rz);
@@ -84,8 +84,10 @@ function template(species){
   box(body,.34,.39,.035,.08,'#e8c85b',0,.52,-.325);
   for(const sign of [-1,1]){
    const shape=new T.Shape();shape.moveTo(0,0);shape.lineTo(sign*.48,.37);shape.quadraticCurveTo(sign*.62,.11,sign*.47,-.08);shape.lineTo(sign*.30,-.01);shape.lineTo(0,-.20);shape.closePath();
-   const wing=add(body,new T.ExtrudeGeometry(shape,{depth:.025,bevelEnabled:false}),'#e6bf50',sign*.25,.72,.27,0,sign*.25,0);wing.name='DragonWing';
-   tube(body,[[sign*.25,.72,.28],[sign*.73,1.09,.28],[sign*.73,.65,.28]],.025,base);
+   const hinge=new T.Group();hinge.name=sign===1?'AnimalWingL':'AnimalWingR';hinge.position.set(sign*.25,.72,.27);hinge.rotation.y=sign*.25;wings.add(hinge);
+   add(hinge,new T.ExtrudeGeometry(shape,{depth:.025,bevelEnabled:false}),'#e6bf50',0,0,0);
+   tube(hinge,[[0,0,.01],[sign*.48,.37,.01],[sign*.48,-.07,.01]],.025,base);
+   bake(hinge);
   }
   for(let i=0;i<4;i++)cone(body,.07,.16,'#95c77c',0,.84,.02+i*.16);
  }
@@ -95,11 +97,21 @@ function template(species){
  const result={root,eyeHeight:(head.position.y+.065-bounds.min.y)*factor,head};templates.set(species,result);return result;
 }
 export function createAvatar(initial='cat'){
- const body=new T.Group();let model,head,selected,eye=0,disposed=false;
+ const body=new T.Group();let model,head,selected,eye=0,compact=1,disposed=false;
  function setAnimal(value){const next=animalId(value);if(next===selected)return;selected=next;if(model)body.remove(model);const source=template(next);model=source.root.clone(true);head=model.children[1];body.add(model);eye=source.eyeHeight;body.userData.animal=next;}
  setAnimal(initial);body.name='AnimalAvatar';
- return {body,get head(){return head;},get eyeHeight(){return eye;},get height(){return animalInfo(selected).height;},ready:Promise.resolve(),setAnimal,
-  update(dt,state,yaw=0,pitch=0){if(disposed)return;model.position.y=template(selected).root.position.y+(state==='sit'?.79:0);head.rotation.set(-Math.max(-.45,Math.min(.45,pitch)),yaw,0,'YXZ');},
+ return {body,get head(){return head;},get eyeHeight(){return eye*compact;},get height(){return animalInfo(selected).height*compact;},ready:Promise.resolve(),setAnimal,
+  update(dt,state,yaw=0,pitch=0){
+   if(disposed)return;
+   const seated=state==='sit',source=template(selected);
+   // Compact sitting silhouettes stay below the chair back without changing
+   // the full-size standing species or squashing head/body proportions.
+   compact=seated?Math.min(1,.96/animalInfo(selected).height):1;
+   model.scale.copy(source.root.scale).multiplyScalar(compact);
+   model.position.y=source.root.position.y*compact+(seated?.79:0);
+   for(const sign of [-1,1]){const wing=model.getObjectByName(sign===1?'AnimalWingL':'AnimalWingR');if(wing)wing.rotation.y=sign*(seated?-1.15:.25);}
+   head.rotation.set(-Math.max(-.45,Math.min(.45,pitch)),yaw,0,'YXZ');
+  },
   dispose(){disposed=true;body.remove(model);},get animal(){return selected;}};
 }
 export const loadMotions=()=>Promise.resolve();
