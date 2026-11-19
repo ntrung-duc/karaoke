@@ -5,10 +5,11 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
 import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,expireMembers,stateEvent,RESUME_GRACE_MS} from './room-state.mjs';
 import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
+import {createMovieCatalog} from './movie-catalog.mjs';
 
 // The configured store owns room state: RAM with Redis checkpoints on a single
 // server, or Redis transactions and Pub/Sub when multiple servers are required.
-export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
+export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,movieCatalog=createMovieCatalog(),resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
  if(!store){const backend=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):null;store=backend?(stateMode==='local'?createLocalRoomStore(backend):backend):createMemoryStore();}
  const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
  const livekit=!!(livekitUrl&&livekitApiKey&&livekitApiSecret);
@@ -64,7 +65,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
    if(message.type==='state')record.stateRevision=message.revision;
    record.revision=Math.max(record.revision,message.revision);
   }
-  if(message.type==='state'){record.song=message.song;scheduleEnd(record,message.song);scheduleHost(record,message);}
+  if(message.type==='state'){record.song=message.song;record.hostId=message.hostId;record.mediaVersion=message.mediaVersion;scheduleEnd(record,message.song);scheduleHost(record,message);}
   send(record,message);
  }
  async function subscribe(record){
@@ -137,6 +138,30 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
     }).finally(()=>record.searching=false);
     return;
    }
+   if(['movie-search','movie-detail','movie-select'].includes(message.type)){
+    if(!record.ready||!record.id||typeof message.requestId!=='string'||! /^[\w-]{1,64}$/.test(message.requestId))return;
+    const selecting=message.type==='movie-select';
+    const reject=error=>send(record,selecting?{type:'control-result',requestId:message.requestId,accepted:false,error}:{type:'movie-result',requestId:message.requestId,error});
+    if(record.movieBusy||now()-(record.movieAt||0)<500){reject('Chờ một chút rồi thử lại.');return;}
+    if(selecting&&record.hostId!==record.id){reject('Chỉ chủ phòng mới chọn được phim.');return;}
+    const expectedMediaVersion=record.mediaVersion;record.movieBusy=true;record.movieAt=now();
+    const task=message.type==='movie-search'?movieCatalog.search(message.query):movieCatalog.detail(message.slug);
+    task.then(async result=>{
+     if(record.closed)return;
+     if(!selecting){send(record,{type:'movie-result',requestId:message.requestId,...(message.type==='movie-search'?{items:result}:{detail:{...result,episodes:result.episodes.map(({source,...episode})=>episode)}})});return;}
+     const episode=result.episodes.find(entry=>entry.id===message.episode);
+     if(!episode){reject('Hãy chọn một tập phim hợp lệ.');return;}
+     await enqueue(async()=>{
+      if(record.closed)return;
+      const resolvedMovie={slug:result.slug,title:result.title,episode:episode.name,server:episode.server,source:episode.source};
+      const update=await store.transact(key,room=>applyMessage(room,record.id,record.connectionId,message,now(),{resolvedMovie,expectedMediaVersion}));
+      if(update.expired){client.close(4001,'Session expired');return;}
+      if(update.snapshot)receive(record,{message:update.snapshot});
+      if(update.controlResult)send(record,{...update.controlResult,snapshot:update.snapshot});
+     });
+    }).catch(()=>{if(!record.closed)reject('Chưa tải được phim. Kiểm tra tên/link phim và thử lại.');}).finally(()=>record.movieBusy=false);
+    return;
+   }
    // Keep only the newest unsent pose while Redis is busy. Other commands
    // form barriers so a pose cannot overtake standing, jumping or sitting.
    if(message.type==='move'&&record.moveSlot){record.moveSlot.message=message;return;}
@@ -150,8 +175,8 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
     if(slot.message.type==='voice-session'&&result.voice&&livekit){
      try{
      const voice=result.voice,token=new AccessToken(livekitApiKey,livekitApiSecret,{identity:record.id,ttl:'5m'});
-     const singer=voice.owner===record.id;
-     token.addGrant({roomJoin:true,room:'karaoke-'+voice.key,canPublish:singer,...(singer?{canPublishSources:[TrackSource.MICROPHONE]}:{}),canSubscribe:true,canPublishData:false});
+     const singer=voice.group||voice.owner===record.id;
+     token.addGrant({roomJoin:true,room:(voice.group?'movie-':'karaoke-')+voice.key,canPublish:!!singer,...(singer?{canPublishSources:[TrackSource.MICROPHONE]}:{}),canSubscribe:true,canPublishData:false});
      send(record,{type:'voice-session',key:voice.key,url:livekitUrl,token:await token.toJwt()});
      }catch{send(record,{type:'error',message:'Chưa cấp được kết nối âm thanh. Kiểm tra cấu hình LiveKit trên máy chủ.'});}
     }

@@ -17,7 +17,7 @@ function fixture(){
   async setRemoteDescription(value){events.push('sdp-start');await Promise.resolve();this.remoteDescription=value;events.push('sdp-end');}
   async addIceCandidate(){assert.ok(this.remoteDescription);events.push('ice');}
  }
- const context=vm.createContext({voice:{enabled:false},RTCPeerConnection:Peer,MediaStream:class{},peers:new Map(),voiceRetries:new Map(),retiredVoices:new Set(),candidateBacklog:new Map(),voiceRequestAt:new Map(),crypto:{randomUUID},song:{key:'one',owner:'singer'},id:'viewer',stream:null,users:[{id:'singer',mic:true},{id:'viewer'}],ice:[],micOpening:false,
+ const context=vm.createContext({mode:'karaoke',voice:{enabled:false},RTCPeerConnection:Peer,MediaStream:class{},peers:new Map(),voiceRetries:new Map(),retiredVoices:new Set(),candidateBacklog:new Map(),voiceRequestAt:new Map(),crypto:{randomUUID},song:{key:'one',owner:'singer'},id:'viewer',stream:null,users:[{id:'singer',mic:true},{id:'viewer'}],ice:[],micOpening:false,
   $:()=>({textContent:''}),send:m=>sent.push(m),notice(){},output:{attach(){},block(){},muted:false},document:{createElement(){return {setAttribute(){},play:()=>Promise.resolve(),pause(){},remove(){}};},body:{append(){}}},setTimeout:fn=>timers.push(fn),clearTimeout(){}});
  vm.runInContext(source+';globalThis.api={link,signal,offer,closePeer};',context);
  return {context,sent,timers,events,api:context.api};

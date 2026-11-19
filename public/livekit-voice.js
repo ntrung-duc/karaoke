@@ -14,7 +14,7 @@ export function createLivekitVoice({send,getSession,getStream,onAudio,onBlocked,
  function request(){const session=getSession();if(!enabled||!key||!session.connected||connecting||Date.now()-requestedAt<8000)return;requestedAt=Date.now();send({type:'voice-session',key});report('connecting');}
  async function publish(){
   if(!room||status!=='connected'||publishing)return;
-  const session=getSession(),source=(session.owner===session.id?getStream()?.getAudioTracks()[0]:null)??null;
+  const session=getSession(),source=(session.group||session.owner===session.id?getStream()?.getAudioTracks()[0]:null)??null;
   if(source===publishedSource)return;
   const own=generation,current=room;publishing=true;
   try{
@@ -41,7 +41,8 @@ export function createLivekitVoice({send,getSession,getStream,onAudio,onBlocked,
    sdk=await loadSdk();if(own!==generation)return;
    const current=room=new sdk.Room({disconnectOnPageLeave:true});
    current.on(sdk.RoomEvent.TrackSubscribed,(track,publication,participant)=>{
-    if(own!==generation||track.kind!==sdk.Track.Kind.Audio||participant.identity!==getSession().owner)return;
+    const session=getSession();
+    if(own!==generation||track.kind!==sdk.Track.Kind.Audio||!(session.group?participant.identity!==session.id&&session.members?.includes(participant.identity):participant.identity===session.owner))return;
     const element=track.attach();element.hidden=true;element.autoplay=true;element.setAttribute('playsinline','');document.body.append(element);audio.set(publication.trackSid,{track,element});onAudio(element);element.play().catch(onBlocked);onChange();
    });
    current.on(sdk.RoomEvent.TrackUnsubscribed,(track,publication)=>{if(own!==generation)return;const entry=audio.get(publication.trackSid);if(entry){track.detach(entry.element);entry.element.pause();entry.element.srcObject=null;entry.element.remove();audio.delete(publication.trackSid);}onChange();});

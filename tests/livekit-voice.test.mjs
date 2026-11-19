@@ -49,3 +49,18 @@ test('LiveKit SDK endpoint has JavaScript MIME type and cannot expose project se
  const response=await fetch(base+'/lib/livekit-client.js');assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/^text\/javascript/);assert.ok((await response.text()).length>1000);
  assert.equal((await fetch(base+'/.env')).status,404);assert.equal((await fetch(base+'/server/config.mjs')).status,404);
 });
+
+test('movie participants can publish one mic and hear multiple room members; karaoke restores singer-only audio',async()=>{
+ const previous=globalThis.document;globalThis.document={body:{append(){}}};
+ const f=fixture(),source={clone:()=>({stop(){}})};
+ f.setSession({id:'viewer',group:true,members:['viewer','a','b'],key:'movie-one',connected:true});f.setStream({getAudioTracks:()=>[source]});
+ try{
+  f.voice.configure(true);await f.voice.credentials({key:'movie-one',url:'wss://example',token:'movie'});await settle();assert.equal(f.rooms[0].publications.length,1);
+  const track=()=>({kind:'audio',attach:()=>({setAttribute(){},play:()=>Promise.resolve(),pause(){},remove(){}}),detach(){}});
+  for(const id of ['a','b','outsider','viewer'])f.rooms[0].emit('track',track(),{trackSid:id},{identity:id});
+  assert.equal(f.voice.audio.length,2);
+  f.setSession({id:'viewer',owner:'a',key:'song-one',connected:true});f.voice.sync();assert.equal(f.voice.audio.length,0);assert.equal(f.rooms[0].disconnected,true);
+  await f.voice.credentials({key:'song-one',url:'wss://example',token:'song'});await settle();assert.equal(f.rooms[1].publications.length,0);
+  f.rooms[1].emit('track',track(),{trackSid:'b'},{identity:'b'});assert.equal(f.voice.audio.length,0);
+ }finally{f.voice.close();globalThis.document=previous;}
+});

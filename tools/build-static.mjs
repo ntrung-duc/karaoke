@@ -16,4 +16,5 @@ for(const [source,target] of [
  await cp(new URL(`node_modules/three/${source}`,root),destination);
 }
 await cp(new URL('node_modules/livekit-client/dist/livekit-client.esm.mjs',root),new URL('lib/livekit-client.js',output));
+for(const file of ['hls.mjs','hls.worker.js'])await cp(new URL('node_modules/hls.js/dist/'+file,root),new URL('lib/'+file,output));
 console.log(`Static assets ready: ${fileURLToPath(output)}`);
