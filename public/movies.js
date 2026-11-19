@@ -3,6 +3,9 @@ import {moviePosition} from './movie-state.js';
 
 export function createMovies({getId,send,sendControl,getTarget,now,notice,onBlocked,onMount,unlockAudio}){
  const $=selector=>document.querySelector(selector);
+ const controls=$('#movie-controls'),desktopHome=controls.parentElement,mobileControls=matchMedia('(pointer:coarse), (max-width:800px)');
+ const placeControls=()=>{const parent=mobileControls.matches?$('#movie-controls-slot'):desktopHome;if(controls.parentElement!==parent)parent.append(controls);};
+ mobileControls.addEventListener('change',placeControls);placeControls();
  let state={},connected=false,detail=null,request=null,requestTimer,selecting=null,selectionTimer;
  const player=createMoviePlayer({getTarget:()=>{onMount();$('#movie-feedback').hidden=false;$('#movie-feedback-text').textContent='Đang tải phim…';$('#movie-feedback-retry').hidden=true;return getTarget();},now,onBlocked,onReady:()=>{$('#movie-feedback').hidden=true;},onError:text=>{$('#movie-error').textContent=text;$('#movie-retry').hidden=false;$('#movie-feedback').hidden=false;$('#movie-feedback-text').textContent=text;$('#movie-feedback-retry').hidden=false;},onDuration:duration=>{if(state.hostId===getId())send({type:'movie-duration',key:state.movie?.key,duration});},onEnded:()=>{if(state.hostId===getId())control({paused:true,position:state.movie?.duration||moviePosition(state.movie,now())});}});
  function control(extra){if(!state.movie)return;sendControl({type:'movie-playback',key:state.movie.key,hostVersion:state.hostVersion,...extra});}
@@ -57,6 +60,6 @@ export function createMovies({getId,send,sendControl,getTarget,now,notice,onBloc
    for(const item of message.items||[]){const button=document.createElement('button');button.type='button';button.className='movie-result';if(item.poster){const image=document.createElement('img');image.src=item.poster;image.alt='';image.loading='lazy';image.referrerPolicy='no-referrer';button.append(image);}const label=document.createElement('span');label.textContent=item.title+(item.year?' ('+item.year+')':'');button.append(label);button.onclick=()=>ask('movie-detail',{slug:item.slug});$('#movie-results').append(button);}
   },
   tick(){if(document.activeElement!==$('#movie-seek')){$('#movie-seek').value=moviePosition(state.movie,now());$('#movie-seek-value').textContent=format(moviePosition(state.movie,now()));}},
-  close(){clearTimeout(requestTimer);clearTimeout(selectionTimer);player.close();}
+  close(){mobileControls.removeEventListener('change',placeControls);clearTimeout(requestTimer);clearTimeout(selectionTimer);player.close();}
  };
 }

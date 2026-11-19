@@ -102,3 +102,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
  #movie-controls{left:auto;right:var(--hud-right);top:var(--hud-top);width:min(500px,calc(100vw - var(--hud-left) - var(--hud-right) - 128px))}
  #movie-feedback{top:calc(var(--hud-top) + 44px)}
 }
+#room #movie-controls{position:static;transform:none;inset:auto;width:100%;max-width:none;margin:12px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px}
+#room #movie-controls button{grid-column:1/-1;min-height:36px}
+#room #movie-controls input{width:100%;margin:0;min-width:0}
+#room #movie-controls output{min-width:42px;text-align:right}
