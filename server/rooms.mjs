@@ -3,7 +3,7 @@ import {createLocalRoomStore} from './local-room-store.mjs';
 import {AccessToken,TrackSource} from 'livekit-server-sdk';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {createMemoryStore,createRedisStore} from './room-store.mjs';
-import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,RESUME_GRACE_MS} from './room-state.mjs';
+import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,expireMembers,stateEvent,RESUME_GRACE_MS} from './room-state.mjs';
 import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
 
 // The configured store owns room state: RAM with Redis checkpoints on a single
@@ -13,6 +13,21 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
  const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
  const livekit=!!(livekitUrl&&livekitApiKey&&livekitApiSecret);
  const clients=new Set(),channels=new Map();let stopping=false;
+ function scheduleHost(record,state){
+  const channel=record.channel;if(!channel)return;
+  const deadline=state.hostReconnectUntil,version=Number.isFinite(deadline)?state.hostId+':'+deadline:null;
+  if(channel.hostVersion===version)return;
+  channel.hostVersion=version;clearTimeout(channel.hostTimer);
+  if(!version)return;
+  const expire=()=>{
+   if(stopping||!channel.clients.size||channel.hostVersion!==version)return;
+   if(deadline>now()){channel.hostTimer=setTimeout(expire,Math.ceil(deadline-now())+5);channel.hostTimer.unref?.();return;}
+   store.transact(record.key,room=>({events:expireMembers(room,now())?[stateEvent(room,now())]:[]})).catch(()=>{
+    if(channel.hostVersion===version){channel.hostTimer=setTimeout(expire,1000);channel.hostTimer.unref?.();}
+   });
+  };
+  channel.hostTimer=setTimeout(expire,Math.max(10,deadline-now()));channel.hostTimer.unref?.();
+ }
  function scheduleEnd(record,song){
   const channel=record.channel;if(!channel)return;
   const deadline=song&&!Number.isFinite(song.pausedAt)?song.endAt:null;
@@ -49,7 +64,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
    if(message.type==='state')record.stateRevision=message.revision;
    record.revision=Math.max(record.revision,message.revision);
   }
-  if(message.type==='state'){record.song=message.song;scheduleEnd(record,message.song);}
+  if(message.type==='state'){record.song=message.song;scheduleEnd(record,message.song);scheduleHost(record,message);}
   send(record,message);
  }
  async function subscribe(record){
@@ -65,7 +80,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
   const channel=record.channel;if(!channel)return;
   channel.clients.delete(record);
   if(channel.clients.size===0&&channels.get(record.key)===channel){
-   clearTimeout(channel.endTimer);
+   clearTimeout(channel.endTimer);clearTimeout(channel.hostTimer);
    channel.closing=(async()=>{
     const unsubscribe=await channel.ready;await unsubscribe();
    })().finally(()=>{if(channels.get(record.key)===channel)channels.delete(record.key);});
@@ -183,7 +198,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
    stopping=true;stopUnavailable();
    const current=[...clients];for(const r of current){clearInterval(r.heartbeat);clearTimeout(r.rotation);r.client.terminate();}
    await Promise.all(current.map(r=>r.pending));
-   for(const channel of channels.values()){clearTimeout(channel.endTimer);await channel.ready.then(stop=>stop()).catch(()=>{});}
+   for(const channel of channels.values()){clearTimeout(channel.endTimer);clearTimeout(channel.hostTimer);await channel.ready.then(stop=>stop()).catch(()=>{});}
    channels.clear();await store.close();
   },
  };

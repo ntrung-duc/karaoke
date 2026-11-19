@@ -12,6 +12,7 @@ const files = new Map([
   ['/animal-avatar.js', 'public/animal-avatar.js'],
   ['/turn-state.js', 'public/turn-state.js'],
   ['/song-queue.js', 'public/song-queue.js'],
+  ['/room-host.js', 'public/room-host.js'],
   ['/livekit-voice.js', 'public/livekit-voice.js'],
   ['/lib/livekit-client.js', 'node_modules/livekit-client/dist/livekit-client.esm.mjs'],
   ['/singer-mic.js', 'public/singer-mic.js'],

@@ -12,6 +12,7 @@ import {createSongQueue} from './song-queue.js';
 import {createSongSearch} from './youtube-search.js';
 import {createSingerMic} from './singer-mic.js';
 import {createLivekitVoice} from './livekit-voice.js';
+import {createRoomHost} from './room-host.js';
 const $=s=>document.querySelector(s),room=roomName(new URLSearchParams(location.search).get('room'));
 function controlIcon(button,label,icon){
  const symbol=document.createElement('span');symbol.className='control-icon';symbol.setAttribute('aria-hidden','true');if(typeof icon==='string')symbol.textContent=icon;else symbol.append(icon);
@@ -61,6 +62,7 @@ audioUnlock.onclick=()=>{output.enable();voice.unlock();audioUnlock.hidden=true;
 for(const kind of ['music','voice'])$('#'+kind+'-volume').oninput=event=>output.setVolume(kind,event.target.value);
 function send(m){return connection?.send(m)}
 const pendingControls=new Map();
+const roomHost=createRoomHost({getId:()=>id,sendControl,notice});
 let playbackIntent=null,authoritativeSong=null;
 function sendControl(message){
  const requestId=crypto.randomUUID();
@@ -69,6 +71,7 @@ function sendControl(message){
  pendingControls.set(requestId,timer);return requestId;
 }
 function receiveControl(message){
+ roomHost.receive(message);
  if(!pendingControls.has(message.requestId))return;
  clearTimeout(pendingControls.get(message.requestId));pendingControls.delete(message.requestId);
  if(playbackIntent?.requestId===message.requestId)playbackIntent=null;
@@ -213,8 +216,8 @@ function render(m){
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){closePeer(e);peers.delete(pid)}
  hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song);const me=users.find(u=>u.id===id);
  if(me?.animalChosen){chosenAnimal=animalId(me.animal);localStorage.setItem('rap-animal',chosenAnimal);}
- $('#singer-controls').hidden=!mine;$('#listener-voice-volume').hidden=mine;$('#singer-reverb').hidden=!mine;$('#throw-flower').hidden=!song||mine;$('#throw-flower').disabled=!connected;controlIcon($('#pause'),song?.awaitingStart?'Bắt đầu hát':Number.isFinite(song?.pausedAt)?'Tiếp tục':'Tạm dừng',Number.isFinite(song?.pausedAt)?'▶':'⏸');$('#pause').disabled=$('#next').disabled=!connected;updateMicControls();$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length+(song?1:0);$('#people').replaceChildren();$('#songs').replaceChildren();
- for(const u of users)row($('#people'),(u.mic?'🎙 ':'●　')+u.name+(u.id===id?' (bạn)':'')+(u.id===song?.owner?' · Trên sân khấu':u.seat>=0?' · Ghế '+(u.seat+1):' · Đang đứng'));
+ $('#singer-controls').hidden=!mine;$('#listener-voice-volume').hidden=mine;$('#singer-reverb').hidden=!mine;$('#throw-flower').hidden=!song||mine;$('#throw-flower').disabled=!connected;controlIcon($('#pause'),song?.awaitingStart?'Bắt đầu hát':Number.isFinite(song?.pausedAt)?'Tiếp tục':'Tạm dừng',Number.isFinite(song?.pausedAt)?'▶':'⏸');$('#pause').disabled=$('#next').disabled=!connected;updateMicControls();$('#sit').disabled=mine;$('#sit').hidden=me?.seat<0||!me;$('#sit').textContent='Đứng dậy';$('#total').textContent=users.length;$('#count').textContent=m.queue.length+(song?1:0);$('#songs').replaceChildren();
+ roomHost.render(m);
  const ownerName=s=>users.find(u=>u.id===s.owner)?.name||'Khách';
  $('#turn-status').textContent=!song?'Sân khấu đang trống. Chọn bài để đăng ký lượt hát.':mine?(song.awaitingStart?'Đến lượt bạn. Kiểm tra mic rồi bấm Bắt đầu hát.':Number.isFinite(song.pausedAt)?'Bài của bạn đang tạm dừng.':'Bạn đang hát.'):(song.awaitingStart?ownerName(song)+' đang chuẩn bị hát.':Number.isFinite(song.pausedAt)?'Bài hát đang tạm dừng.':ownerName(song)+' đang hát. Bạn có thể đăng ký bài tiếp theo.');
  if(song)row($('#songs'),'♫　'+song.title+' · '+ownerName(song)+(song.awaitingStart?' · Chờ bắt đầu':Number.isFinite(song.pausedAt)?' · Tạm dừng':' · Đang hát'));else row($('#songs'),'Sân khấu đang trống.',true);
@@ -230,6 +233,7 @@ function connect(){
   onHello(m){renderedStateRevision=0;id=m.id;ice=m.ice;connected=true;voice.configure(m.voiceTransport==='livekit');hall?.reconnect();send({type:'name',value:$('#name').value});send({type:'appearance',animal:chosenAnimal});if(stream)send({type:'mic',on:true});},
   onMessage(m){if(m.type==='control-result'){receiveControl(m);}else if(m.type==='queue-result'){songQueue.receive(m);}else if(m.type==='video-position'){singerPosition=m;sync();}else if(m.type==='voice-session'){voice.credentials(m);}else if(m.type==='clock'){if(serverClock.receive(m))sync();}else if(m.type==='search-results')search.receive(m);else if(m.type==='state')render(m);else if(m.type==='chat'){chat.receive(m.entry);hall?.chat(m.entry);}else if(m.type==='flower')hall?.flower(m);else if(m.type==='pose'){hall?.peer(m.user);}else if(m.type==='signal')signal(m).catch(()=>notice('Kết nối giọng hát bị gián đoạn.'));},
   onStatus(status){
+   roomHost.connected(status==='connected');
    chat.connected(status==='connected');$('#throw-flower').disabled=status!=='connected';
    if(status==='connected'){serverClock.start();$('#status').textContent='●　Trực tuyến';$('#pause').disabled=$('#next').disabled=false;updateMicControls();return;}
    serverClock.stop();search.disconnected();songQueue.disconnected();for(const timer of pendingControls.values())clearTimeout(timer);pendingControls.clear();playbackIntent=null;song=authoritativeSong;connected=false;updateMicControls();$('#pause').disabled=$('#next').disabled=true;
