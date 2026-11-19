@@ -8,7 +8,7 @@ export function batchStaticBoxes(scene,geometry){
  scene.updateMatrixWorld(true);
  const groups=new Map(),meshes=[];
  scene.traverse(object=>{
-  if(!object.isMesh||object.isInstancedMesh||object.geometry!==geometry)return;
+  if(!object.isMesh||object.isInstancedMesh||object.geometry!==geometry||object.parent?.userData.dynamic)return;
   const key=object.material.uuid+':'+object.castShadow+':'+object.receiveShadow;
   if(!groups.has(key))groups.set(key,[]);
   groups.get(key).push(object);meshes.push(object);
@@ -63,7 +63,7 @@ export function createScenery(scene,box,mat){
  for(let i=0;i<15;i++){a.beginPath();a.arc(600,720,345+i*14,Math.PI,Math.PI*2);a.strokeStyle='rgba(233,185,128,.15)';a.stroke()}
  a.textAlign='center';a.fillStyle='#f3d99f';a.font='italic 112px Georgia';a.fillText('Iron Dome',600,290);a.font='24px Georgia';a.fillText('K A R A O K E',600,362);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;return tex}
  const poster=new T.MeshBasicMaterial({map:art()}),hole=new T.MeshBasicMaterial({color:0,opacity:0,blending:T.NoBlending,side:T.FrontSide});
- function screen(x,y,z,w,h,rot){const group=new T.Group();group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {mesh,x,y,z,w,h,rot}}
+ function screen(x,y,z,w,h,rot){const group=new T.Group();group.name='StageScreen';group.userData.dynamic=true;group.position.set(x,y,z);group.rotation.y=rot;scene.add(group);box(0,0,-.1,w+.18,h+.18,.18,gold,group);const mesh=new T.Mesh(new T.PlaneGeometry(w,h),poster);mesh.position.z=.015;group.add(mesh);return {group,mesh,x,y,z,w,h,rot}}
  // Raise the audience screen above the singer and in front of the upper beam.
  // The continuous red curtain remains visible in the former screen location.
  const rear=screen(0,6.0,-6.35,8.75,3.7,0);
@@ -102,5 +102,14 @@ export function createScenery(scene,box,mat){
  spot.castShadow=true;spot.shadow.bias=-.0003;spot.shadow.normalBias=.018;scene.add(spot,spot.target);
  const fixture=new T.Mesh(new T.CylinderGeometry(.19,.24,.56,12),mat('#33313c'));fixture.position.copy(spot.position);scene.add(fixture);
  const shaft=new T.Mesh(new T.ConeGeometry(1,1,36,1,true),new T.MeshBasicMaterial({color:0xffdaaf,transparent:true,opacity:.035,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending}));scene.add(shaft);
- return {rear,poster,hole,spot,shaft,fixture,chairs,microphone};
+ let cinema=false;
+ function setMode(mode){
+  const next=mode==='movie';if(next===cinema)return;cinema=next;
+  for(const object of [microphone,spot,shaft,fixture])object.visible=!cinema;
+  // Fill the curtain area for films, with a true 16:9 projection. Keep the
+  // screen frame dynamic so static batching cannot leave its old outline.
+  rear.w=cinema?12.4:8.75;rear.h=cinema?6.975:3.7;rear.y=cinema?4.9:6;
+  rear.group.position.y=rear.y;rear.group.scale.set(rear.w/8.75,rear.h/3.7,1);
+ }
+ return {rear,poster,hole,spot,shaft,fixture,chairs,microphone,setMode};
 }

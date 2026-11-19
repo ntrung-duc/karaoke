@@ -225,7 +225,7 @@ function render(m){
  if(changedTurn&&keepMic){for(const entry of peers.values())closePeer(entry);peers.clear();}
  else if(changedTurn||stream&&!mine||!mine&&!users.find(u=>u.id===song?.owner)?.mic)stopMic();
  for(const [pid,e] of peers)if(!users.some(u=>u.id===pid)){closePeer(e);peers.delete(pid)}
- hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song||mode==='movie'&&!!m.movie);const me=users.find(u=>u.id===id);
+ hall?.users(users,song?.owner,m.now);hall?.flowerTurn(song?.key??null);hall?.media(!!song||mode==='movie'&&!!m.movie,mode);const me=users.find(u=>u.id===id);
  movies.render(m);$('#media-panel-label').textContent='Chọn bài / Phim';$('#karaoke-picker').hidden=false;if(changedMode)$('#karaoke-picker').open=mode!=='movie';$('#music-volume-label').textContent=mode==='movie'?'Tiếng phim':'Nhạc nền';$('#voice-volume-label').textContent=mode==='movie'?'Trò chuyện':'Giọng hát';$('#karaoke-delay').hidden=mode==='movie';$('#local-audio-help').textContent=mode==='movie'?'Chỉ thay đổi tiếng phim và trò chuyện bạn nghe. Dùng tai nghe để tránh vọng tiếng.':'Chỉ thay đổi âm lượng bạn nghe. Nhạc nhỏ hơn giúp nghe rõ giọng hát.';if(changedMode)$('#movie-picker').open=mode==='movie';$('#listener-voice-volume').hidden=false;
  if(changedMode&&mode==='karaoke')createVideoPlayer();
  if(me?.animalChosen){chosenAnimal=animalId(me.animal);localStorage.setItem('rap-animal',chosenAnimal);}
