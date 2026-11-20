@@ -2,7 +2,8 @@ import {MAX_CHAT_HISTORY} from './session.js';
 
 export function createChat({send,getId,isOpen,notice}){
  const form=document.querySelector('#chat-form'),input=document.querySelector('#chat-input'),button=form.querySelector('button'),log=document.querySelector('#chat-log'),badge=document.querySelector('#chat-unread');
- let entries=[],connected=false,unread=0,lastSent=0;
+ let entries=[],connected=false,allowed=true,unread=0,lastSent=0;
+ function availability(){button.disabled=!connected||!allowed;input.disabled=!allowed;}
  function read(){unread=0;badge.hidden=true;badge.textContent='';}
  function draw(){
   const stick=log.scrollHeight-log.scrollTop-log.clientHeight<70;
@@ -18,7 +19,7 @@ export function createChat({send,getId,isOpen,notice}){
  }
  form.onsubmit=event=>{
   event.preventDefault();const text=input.value.trim();if(!text)return;
-  if(!connected){notice('Đang chờ kết nối chat.');return;}
+  if(!connected||!allowed){notice(allowed?'Đang chờ kết nối chat.':'Chat đang khóa trong lượt này.');return;}
   if(Date.now()-lastSent<750){notice('Chờ một chút rồi gửi tiếp nhé.');return;}
   if(send({type:'chat',text,clientId:crypto.randomUUID()})){lastSent=Date.now();input.value='';notice('');input.focus();}
   else notice('Chưa gửi được tin nhắn. Nội dung vẫn được giữ lại.');
@@ -28,7 +29,8 @@ export function createChat({send,getId,isOpen,notice}){
  return {
   read,
   open(){read();log.scrollTop=0;},
-  connected(on){connected=on;button.disabled=!on;},
+  connected(on){connected=on;availability();},
+  context(on,placeholder){allowed=on;input.placeholder=placeholder;availability();},
   history(messages){
    const recent=messages.slice(-MAX_CHAT_HISTORY);
    if(entries.length===recent.length&&entries.at(-1)?.id===recent.at(-1)?.id)return;

@@ -6,6 +6,7 @@ import {createMemoryStore,createRedisStore} from './room-store.mjs';
 import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,expireMembers,stateEvent,RESUME_GRACE_MS} from './room-state.mjs';
 import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
 import {createMovieCatalog} from './movie-catalog.mjs';
+import {tickWerewolf} from './werewolf.mjs';
 
 // The configured store owns room state: RAM with Redis checkpoints on a single
 // server, or Redis transactions and Pub/Sub when multiple servers are required.
@@ -14,6 +15,16 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
  const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
  const livekit=!!(livekitUrl&&livekitApiKey&&livekitApiSecret);
  const clients=new Set(),channels=new Map();let stopping=false;
+ function scheduleWerewolf(record,state){
+  const channel=record.channel,g=state.werewolf,deadline=g?.until,version=deadline?g.id+':'+g.version:null;
+  if(!channel||channel.werewolfVersion===version)return;channel.werewolfVersion=version;clearTimeout(channel.werewolfTimer);
+  if(!version)return;
+  const tick=()=>{
+   if(stopping||!channel.clients.size||channel.werewolfVersion!==version)return;
+   if(now()<deadline){channel.werewolfTimer=setTimeout(tick,deadline-now()+5);channel.werewolfTimer.unref?.();return;}
+   store.transact(record.key,room=>({events:tickWerewolf(room,now())?[stateEvent(room,now())]:[]})).catch(()=>{if(channel.werewolfVersion===version){channel.werewolfTimer=setTimeout(tick,1000);channel.werewolfTimer.unref?.();}});
+  };channel.werewolfTimer=setTimeout(tick,Math.max(10,deadline-now()));channel.werewolfTimer.unref?.();
+ }
  function scheduleHost(record,state){
   const channel=record.channel;if(!channel)return;
   const deadline=state.hostReconnectUntil,version=Number.isFinite(deadline)?state.hostId+':'+deadline:null;
@@ -66,7 +77,8 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
    record.revision=Math.max(record.revision,message.revision);
   }
   if(message.type==='state'){record.song=message.song;record.hostId=message.hostId;record.mediaVersion=message.mediaVersion;scheduleEnd(record,message.song);scheduleHost(record,message);}
-  send(record,message);
+  if(message.type==='state')scheduleWerewolf(record,message);
+  send(record,event.views?.[record.id]?{...message,...event.views[record.id]}:message);
  }
  async function subscribe(record){
   let channel=channels.get(record.key);
@@ -81,7 +93,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
   const channel=record.channel;if(!channel)return;
   channel.clients.delete(record);
   if(channel.clients.size===0&&channels.get(record.key)===channel){
-   clearTimeout(channel.endTimer);clearTimeout(channel.hostTimer);
+   clearTimeout(channel.endTimer);clearTimeout(channel.hostTimer);clearTimeout(channel.werewolfTimer);
    channel.closing=(async()=>{
     const unsubscribe=await channel.ready;await unsubscribe();
    })().finally(()=>{if(channels.get(record.key)===channel)channels.delete(record.key);});
@@ -176,7 +188,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
      try{
      const voice=result.voice,token=new AccessToken(livekitApiKey,livekitApiSecret,{identity:record.id,ttl:'5m'});
      const singer=voice.group||voice.owner===record.id;
-     token.addGrant({roomJoin:true,room:(voice.group?'movie-':'karaoke-')+voice.key,canPublish:!!singer,...(singer?{canPublishSources:[TrackSource.MICROPHONE]}:{}),canSubscribe:true,canPublishData:false});
+     token.addGrant({roomJoin:true,room:(voice.namespace==='werewolf'?'werewolf-':voice.group?'movie-':'karaoke-')+voice.key,canPublish:!!singer,...(singer?{canPublishSources:[TrackSource.MICROPHONE]}:{}),canSubscribe:true,canPublishData:false});
      send(record,{type:'voice-session',key:voice.key,url:livekitUrl,token:await token.toJwt()});
      }catch{send(record,{type:'error',message:'Chưa cấp được kết nối âm thanh. Kiểm tra cấu hình LiveKit trên máy chủ.'});}
     }
@@ -198,7 +210,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
    const id=randomUUID(),token=randomBytes(32).toString('base64url');
    const result=await store.transact(key,room=>{
     const joined=joinMember(room,{id,connectionId:record.connectionId,token,resumeToken},now());
-    return {...joined,snapshot:snapshot(room,now())};
+    return {...joined,snapshot:snapshot(room,now(),joined.id)};
    });
    record.id=result.id;
    if(record.closed)return;

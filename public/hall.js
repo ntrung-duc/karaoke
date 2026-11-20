@@ -14,8 +14,10 @@ import {pathToSeat} from './navigation.js';
 import {createRenderBudget} from './render-budget.js';
 import {createJoystick,createTouchCamera} from './mobile-controls.js';
 import {singerScreenRect} from './singer-layout.js';
+import {createWerewolfScene} from './werewolf-scene.js';
 export function buildHall(view,send,me){
  const scene=new T.Scene(),overlay=new T.Scene(),camera=new T.PerspectiveCamera(62,1,.08,95);
+ const theater=new T.Group();scene.add(theater);const wolfArea=createWerewolfScene(scene);let wwState=null,wwUsers=[];
  const flowers=createFlowers(scene);
  const web=new T.WebGLRenderer({antialias:false,alpha:true,powerPreference:'high-performance'});web.domElement.tabIndex=0;web.domElement.setAttribute('aria-label','Nhà hát 3D: WASD di chuyển, Space nhảy');web.shadowMap.enabled=false;web.setClearColor(0x24191f,1);web.setPixelRatio(Math.min(devicePixelRatio,1));view.prepend(web.domElement);
  const css=new CSS3DRenderer();Object.assign(css.domElement.style,{position:'absolute',inset:'0',pointerEvents:'none'});view.prepend(css.domElement);
@@ -23,12 +25,12 @@ export function buildHall(view,send,me){
  const motionDebug=new URLSearchParams(location.search).has('motionDebug');let measuredInput=0,pendingInput=0,debugFrames=0,debugTime=0;
  const cube=new T.BoxGeometry(),materials=new Map(),palette=['#1684bd','#238ab8','#207eb2','#348ec2','#227aa8','#2888b8'];
  function mat(c){if(!materials.has(c))materials.set(c,new T.MeshStandardMaterial({color:c,roughness:.79}));return materials.get(c)}
- function box(x,y,z,w,h,d,c,parent=scene){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
- const {rear,poster,hole,spot,shaft,fixture,microphone,setMode}=createScenery(scene,box,mat);
- batchStaticBoxes(scene,cube);
+ function box(x,y,z,w,h,d,c,parent=theater){const o=new T.Mesh(cube,mat(c));o.castShadow=h>.2;o.receiveShadow=true;o.scale.set(w,h,d);o.position.set(x,y,z);parent.add(o);return o}
+ const {rear,poster,hole,spot,shaft,fixture,microphone,setMode}=createScenery(theater,box,mat);
+ batchStaticBoxes(theater,cube);
  const axis=new T.Vector3(0,1,0),ray=new T.Vector3(),aim=new T.Vector3();
  function focusStage(dt){
-  if(!spot.visible)return;
+  if(wwState||!spot.visible)return;
   const singer=actors.get(api.owner);
   microphone.scale.y=Math.max(.25,(singer?.eyeHeight??1.5)/1.48);
   aim.set(singer?.body.position.x??0,(singer?.body.position.y??1)+(singer?.height??1)*.5,singer?.body.position.z??-4.7);
@@ -38,7 +40,7 @@ export function buildHall(view,send,me){
  } const actors=new Map(),input=createMovementInput(),keys=input.keys,seatGesture=createSeatGesture();const cameraControls=createCameraControls();let self=null,active=false,last=0,previous=performance.now(),dirty=true,drag=null,eyeYaw=0,eyePitch=0,clockOffset=0,pendingStand=false,walkTo=null;
  const drawer=document.querySelector('#drawer'),welcome=document.querySelector('#welcome-dialog');
  const editing=element=>!!element?.closest('input,textarea,select,[contenteditable="true"]');
- const blocked=()=>!drawer.hidden||!!document.querySelector('dialog[open]');
+ const blocked=()=>!!wwState||!drawer.hidden||!!document.querySelector('dialog[open]');
  const focusHall=()=>{if(!document.querySelector('dialog[open]'))web.domElement.focus({preventScroll:true});};
  const seatRay=new T.Raycaster(),pointer=new T.Vector2();
  const seatProxy=new T.InstancedMesh(new T.BoxGeometry(1.42,1.8,1.3),new T.MeshBasicMaterial(),seats.length),seatMatrix=new T.Matrix4();
@@ -57,11 +59,11 @@ export function buildHall(view,send,me){
   for(const [id,label] of overhead)if(!actors.has(id)){label.remove();overhead.delete(id);speech.delete(id);}
   for(const [id,a] of actors){
    if(speech.get(id)?.until<Date.now())speech.delete(id);
-   const text=speech.get(id)?.text,show=a.body.visible&&(hovered===id||!!text);
+   const text=speech.get(id)?.text,show=a.body.visible&&(!!wwState||hovered===id||!!text);
    let label=overhead.get(id);if(!label&&show){label=document.createElement('div');label.className='avatar-overhead';document.querySelector('main').append(label);overhead.set(id,label);}if(!label)continue;
    label.hidden=!show;if(!show)continue;
-   const content=(a.user?.name||'Guest')+'\n'+(text||'');if(label.dataset.content!==content){label.dataset.content=content;label.replaceChildren();const name=document.createElement('strong');name.textContent=a.user?.name||'Guest';label.append(name);if(text){const bubble=document.createElement('div');bubble.textContent=text;label.append(bubble);}}
-   a.body.getWorldPosition(labelPoint);labelPoint.y+=a.height+.18+(a.user?.seat>=0?.79:0);labelPoint.project(camera);label.hidden=labelPoint.z>1||labelPoint.z< -1;const rect=web.domElement.getBoundingClientRect();label.style.left=(rect.left+(labelPoint.x+1)*rect.width/2)+'px';label.style.top=(rect.top+(1-labelPoint.y)*rect.height/2)+'px';
+   const seatNumber=wwState?.players.findIndex(p=>p.id===id),displayName=(wwState&&seatNumber>=0?(seatNumber+1)+'. ':'')+(a.user?.name||'Guest')+(wwState&&a.user?.mic?' 🎙':'');const content=displayName+'\n'+(text||'');if(label.dataset.content!==content){label.dataset.content=content;label.replaceChildren();const name=document.createElement('strong');name.textContent=displayName;label.append(name);if(text){const bubble=document.createElement('div');bubble.textContent=text;label.append(bubble);}}
+   a.body.getWorldPosition(labelPoint);labelPoint.y+=a.height+.18+(wwState?(a.wwSeated?.79:0):(a.user?.seat>=0?.79:0));labelPoint.project(camera);label.hidden=labelPoint.z>1||labelPoint.z< -1;const rect=web.domElement.getBoundingClientRect();label.style.left=(rect.left+(labelPoint.x+1)*rect.width/2)+'px';label.style.top=(rect.top+(1-labelPoint.y)*rect.height/2)+'px';
   }
  }
  let hoverPoint=null,hoverDirty=false;
@@ -103,6 +105,7 @@ export function buildHall(view,send,me){
  if(!a.user)a.body.position.set(u.x,0,u.z);a.user={...u};}
  function animateActors(dt){for(const [id,a] of actors){
  const u=id===me()?self:a.user;if(!u)continue;
+ if(wwState){const p=wolfArea.position(id,wwState,wwUsers);a.wwSeated=p.seated;a.body.position.set(p.x,0,p.z);a.body.rotation.y=p.yaw;a.body.visible=true;a.setAnimal(animalId(u.animal));a.update(dt,p.seated?'sit':'idle',0,0);continue;}
  const sitting=u.seat>=0,singer=id===api.owner,jump=sitting?{height:0,state:null}:jumpPose(u.jumpAt,now());
  const moving=!sitting&&u.gait!=='idle'&&u.movingUntil>now();
  const base=a.facing??(u.bodyYaw??(singer?Math.PI:0));
@@ -124,7 +127,7 @@ export function buildHall(view,send,me){
  if(cameraControls.mode==='overview')first();
  if(self.seat>=0)stand();
  self.jumpAt=now();dirty=true;send({type:'jump'});}
- const api={owner:null,playerTarget,chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(animal){if(self){self.animal=animalId(animal);actors.get(me())?.setAnimal(self.animal);}},media(on,mode='karaoke'){setMode(mode);active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
+ const api={owner:null,playerTarget,werewolf(game,users){wwState=game;wwUsers=users;theater.visible=!game;wolfArea.update(game,users);web.setClearColor(game?0x101a24:0x24191f,1);if(game){releaseControls();active=false;hideSeatHover();}},chat(entry){speech.set(entry.userId,{text:entry.text,until:Date.now()+7000});},flower(event){flowers.receive(event,now());},flowerTurn(key){flowers.turn(key);},focus:focusHall,reconnect(){if(pendingStand)send({type:'seat',index:-1});dirty=true;},appearance(animal){if(self){self.animal=animalId(animal);actors.get(me())?.setAnimal(self.animal);}},media(on,mode='karaoke'){setMode(mode);active=on;host.style.visibility=on?'visible':'hidden'},users(users,owner,serverNow){const previousOwner=api.owner,changed=previousOwner!==owner;api.owner=owner;if(Number.isFinite(serverNow))clockOffset=serverNow-Date.now();hoverDirty=true;
  for(const [id,a] of actors)if(!users.some(u=>u.id===id)){scene.remove(a.body);a.dispose();actors.delete(id)}
  for(const u of users){if(u.id===me()){const teleport=changed&&(owner===u.id||previousOwner===u.id),result=reconcilePlayer(self,u,{pendingStand,teleport,now:now()});self=result.player;pendingStand=result.pendingStand;cameraControls.sync(self,teleport);}pose(u)}angle()},peer(u){if(u.id!==me())pose(u);},camera(){if(cameraControls.cycle(self))dirty=true;eyeYaw=eyePitch=0;hoverDirty=true;angle();if(self)pose(self)},seat(){cancelWalk();if(self?.seat>=0){stand();first();focusHall();}}};
  web.domElement.oncontextmenu=e=>e.preventDefault();
@@ -136,6 +139,7 @@ export function buildHall(view,send,me){
  function turnCamera(dx,dy){if(cameraControls.mode==='overview'){eyeYaw-=dx;eyePitch=Math.max(-.55,Math.min(.65,eyePitch-dy));}else if(cameraControls.turn(dx,dy,self))dirty=true;}
  function zoomCamera(delta){const previousMode=cameraControls.mode;if(cameraControls.zoom(delta,self))dirty=true;hoverDirty=true;if(previousMode!==cameraControls.mode)angle();}
  web.domElement.onpointerdown=e=>{
+  if(wwState)return;
   if(welcome.open||e.button!==0&&e.button!==2)return;
   if(e.pointerType==='touch'){
    e.preventDefault();if(!drawer.hidden)document.querySelector('#close').click();focusHall();hideSeatHover();
@@ -148,6 +152,7 @@ export function buildHall(view,send,me){
   focusHall();drag=[e.clientX,e.clientY];seatGesture.begin(e.button,e.clientX,e.clientY,allowPick);hideSeatHover();web.domElement.setPointerCapture(e.pointerId);
  };
  web.domElement.onpointermove=e=>{
+  if(wwState)return;
   seatGesture.move(e.clientX,e.clientY);
   if(e.pointerType==='touch'){
    const gesture=touchCamera.move(e.pointerId,e.clientX,e.clientY);if(!gesture||!self||blocked())return;e.preventDefault();
@@ -157,6 +162,7 @@ export function buildHall(view,send,me){
   hoverPoint=[e.clientX,e.clientY];hoverDirty=true;if(!drag||!self)return;const dx=(e.clientX-drag[0])*.005,dy=(e.clientY-drag[1])*.004;drag=[e.clientX,e.clientY];turnCamera(dx,dy);
  };
  web.domElement.onpointerup=e=>{
+  if(wwState){if(document.querySelector('dialog[open]'))return;const bounds=web.domElement.getBoundingClientRect();pointer.set((e.clientX-bounds.left)/bounds.width*2-1,-(e.clientY-bounds.top)/bounds.height*2+1);seatRay.setFromCamera(pointer,camera);for(const hit of seatRay.intersectObjects([...actors.values()].map(a=>a.body),true)){const found=[...actors].find(([,a])=>{let object=hit.object;while(object){if(object===a.body)return true;object=object.parent;}return false;});if(found){window.dispatchEvent(new CustomEvent('werewolf-target',{detail:found[0]}));break;}}return;}
   if(seatGesture.release(e.button,e.clientX,e.clientY)){const index=pickSeat(e.clientX,e.clientY);if(index!==null)selectSeat(index);}
   if(e.pointerType==='touch'){touchCamera.end(e.pointerId);hideSeatHover();}else{hoverPoint=[e.clientX,e.clientY];hoverDirty=true;}drag=null;
  };
@@ -183,7 +189,8 @@ export function buildHall(view,send,me){
  function draw(t){requestAnimationFrame(draw);const frameMs=t-previous,dt=Math.min(.1,frameMs/1000);previous=t;
  const viewFov=cameraControls.mode==='overview'?72:62;if(camera.fov!==viewFov){camera.fov=viewFov;camera.updateProjectionMatrix();}
  if(!document.hidden){const ratio=renderBudget.sample(frameMs);if(ratio!==pixelRatio){pixelRatio=ratio;web.setPixelRatio(ratio);}}
- if(cameraControls.mode!=='overview'&&self){const controls=!blocked()&&!editing(document.activeElement);
+ if(wwState){camera.position.set(30,camera.aspect<.8?23:13,camera.aspect<.8?18:13);camera.lookAt(30,.6,0);input.clear();}
+ else if(cameraControls.mode!=='overview'&&self){const controls=!blocked()&&!editing(document.activeElement);
  if(!controls){if(joystick.active)joystick.reset();input.clear();}const movement=input.sample(),f=movement.forward,r=movement.right;
  if(motionDebug&&(f||r)&&movement.lastPressAt!==measuredInput){measuredInput=movement.lastPressAt;pendingInput=measuredInput;}
  if((f||r)&&self.seat>=0)stand();

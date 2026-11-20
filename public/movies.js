@@ -34,9 +34,9 @@ export function createMovies({getId,send,sendControl,getTarget,now,notice,onBloc
  };
  function format(seconds){seconds=Math.floor(seconds||0);return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');}
  function draw(){
-  const mine=state.hostId===getId(),active=state.mode==='movie';
-  $('#room-mode-status').textContent=active?'🎬 Đang xem phim':state.pendingMode==='movie'?'🎬 Sẽ chuyển sang xem phim sau bài đang hát.':'🎤 Đang ở chế độ karaoke';
-  $('#mode-movie').disabled=!connected||!mine||active||state.pendingMode==='movie';$('#mode-karaoke').disabled=!connected||!mine||!active&&!state.pendingMode;
+  const mine=state.hostId===getId(),active=state.mode==='movie',playingWerewolf=state.mode==='werewolf'&&!['lobby','ended'].includes(state.werewolf?.phase);
+  $('#room-mode-status').textContent=state.mode==='werewolf'?'🐺 Đang ở bàn Ma Sói':state.pendingMode==='werewolf'?'🐺 Sẽ chuyển sang Ma Sói sau bài hát.':active?'🎬 Đang xem phim':state.pendingMode==='movie'?'🎬 Sẽ chuyển sang xem phim sau bài đang hát.':'🎤 Đang ở chế độ karaoke';
+  $('#mode-movie').disabled=!connected||!mine||playingWerewolf||active||state.pendingMode==='movie';$('#mode-karaoke').disabled=!connected||!mine||playingWerewolf||state.mode==='karaoke'&&!state.pendingMode;
   $('#movie-host-help').textContent=mine?'Bạn điều khiển phim cho cả phòng. Chọn phim khi đang hát sẽ đợi hết bài rồi chuyển chế độ.':'Bạn có thể tìm phim; chủ phòng chọn tập và điều khiển phát cho cả phòng.';
   $('#movie-choose').disabled=!connected||!mine||!detail||!!selecting;
   $('#movie-watch').hidden=!active;$('#movie-controls').hidden=!active;

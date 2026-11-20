@@ -5,16 +5,17 @@ import {MAX_QUEUE,MAX_NAME,MAX_TITLE,MAX_CHAT,MAX_CHAT_HISTORY} from '../public/
 import {isFace,isSkin,wrapYaw,isShirt,shirtColor} from '../public/avatar-settings.js';
 import {animalId,isAnimal} from '../public/animal-settings.js';
 import {moviePosition} from '../public/movie-state.js';
+import {createWerewolf,publicWerewolf,privateWerewolf,werewolfCommand,tickWerewolf,leaveWerewolf,werewolfVoice,chatChannel,readWerewolfChat,isWerewolfRunning} from './werewolf.mjs';
 
 export const PRESENCE_MS=60000;
 export const RESUME_GRACE_MS=45000;
 const resetMotion={gait:'idle',movingUntil:0,jumpAt:0,emoteAt:0,emote:'parker'};
 export const tokenDigest=token=>createHash('sha256').update(token).digest('hex');
-export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0,hostId:null,hostVersion:0,mode:'karaoke',mediaVersion:0,movie:null,movieVoiceKey:null,pendingMode:null,pendingMovie:null});
+export const emptyRoom=()=>({users:new Map(),queue:[],song:null,chat:[],revision:0,hostId:null,hostVersion:0,mode:'karaoke',mediaVersion:0,movie:null,movieVoiceKey:null,pendingMode:null,pendingMovie:null,werewolf:null});
 export const encodeRoom=room=>JSON.stringify({...room,users:[...room.users]});
 export const decodeRoom=raw=>{if(!raw)return emptyRoom();const value=JSON.parse(raw);if(value.song?.buffering){if(!Number.isFinite(value.song.pausedAt)&&value.song.duration)value.song.endAt=value.song.start+value.song.duration*1000;delete value.song.buffering;delete value.song.playhead;}return {...emptyRoom(),...value,chat:(value.chat||[]).slice(-MAX_CHAT_HISTORY),users:new Map(value.users)};};
-export const snapshot=(room,now)=>({type:'state',mode:room.mode,mediaVersion:room.mediaVersion,movie:room.movie?{...room.movie}:null,movieVoiceKey:room.movieVoiceKey,pendingMode:room.pendingMode,pendingMovie:room.pendingMovie?{title:room.pendingMovie.title,episode:room.pendingMovie.episode}:null,hostId:room.hostId,hostVersion:room.hostVersion,hostReconnectUntil:room.hostId&&!room.users.get(room.hostId)?.connectionId?room.users.get(room.hostId)?.expiresAt??null:null,users:[...room.users.values()].map(u=>({...u.data,connected:!!u.connectionId&&u.expiresAt>now,animal:animalId(u.data.animal),animalChosen:!!u.animalChosen})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song,phase:room.song.awaitingStart?'ready':Number.isFinite(room.song.pausedAt)?'paused':'playing'}:null,chat:(room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
-export const stateEvent=(room,now)=>({message:snapshot(room,now)});
+export const snapshot=(room,now,id)=>({type:'state',werewolf:publicWerewolf(room),wwPrivate:id?privateWerewolf(room,id):null,mode:room.mode,mediaVersion:room.mediaVersion,movie:room.movie?{...room.movie}:null,movieVoiceKey:room.movieVoiceKey,pendingMode:room.pendingMode,pendingMovie:room.pendingMovie?{title:room.pendingMovie.title,episode:room.pendingMovie.episode}:null,hostId:room.hostId,hostVersion:room.hostVersion,hostReconnectUntil:room.hostId&&!room.users.get(room.hostId)?.connectionId?room.users.get(room.hostId)?.expiresAt??null:null,users:[...room.users.values()].map(u=>({...u.data,connected:!!u.connectionId&&u.expiresAt>now,animal:animalId(u.data.animal),animalChosen:!!u.animalChosen})),queue:room.queue.map(s=>({...s})),song:room.song?{...room.song,phase:room.song.awaitingStart?'ready':Number.isFinite(room.song.pausedAt)?'paused':'playing'}:null,chat:readWerewolfChat(room,id,room.chat||[]).slice(-MAX_CHAT_HISTORY).map(entry=>({...entry})),now,revision:room.revision});
+export const stateEvent=(room,now)=>({message:snapshot(room,now),...(room.mode==='werewolf'?{views:Object.fromEntries([...room.users.keys()].map(id=>[id,{wwPrivate:privateWerewolf(room,id),chat:readWerewolfChat(room,id,room.chat||[])}]))}:{})});
 
 // Map insertion order is the original join order and survives checkpoints.
 // Resuming a session must not move it to the back of the succession order.
@@ -26,6 +27,10 @@ function ensureHost(room,now){
  room.hostId=next;room.hostVersion++;return true;
 }
 
+function enterWerewolf(room,now){
+ room.mode='werewolf';room.pendingMode=null;room.pendingMovie=null;room.song=null;room.movie=null;room.movieVoiceKey=null;room.werewolf=createWerewolf();
+ for(const member of room.users.values())member.data.mic=false;
+}
 function enterMovies(room,now){
  room.mode='movie';room.pendingMode=null;room.song=null;room.movieVoiceKey=randomUUID();
  room.movie=room.pendingMovie?{...room.pendingMovie,position:0,paused:true,updatedAt:now}:null;room.pendingMovie=null;
@@ -39,8 +44,9 @@ function pauseEmptyMovie(room,now){
 function advance(room,now){
  const previous=room.users.get(room.song?.owner)?.data;
  if(previous)Object.assign(previous,{x:-5.9,z:-.95,seat:-1,mic:false,yaw:0,bodyYaw:0,pitch:0,...resetMotion});
+ if(room.pendingMode==='werewolf'){enterWerewolf(room,now);return;}
  if(room.pendingMode==='movie'){enterMovies(room,now);return;}
- if(room.mode==='movie')return;
+ if(room.mode==='movie'||room.mode==='werewolf')return;
  room.queue=room.queue.filter(entry=>room.users.has(entry.owner));
  const index=room.queue.findIndex(entry=>{const member=room.users.get(entry.owner);return member.connectionId&&member.expiresAt>now;});
  room.song=index<0?null:room.queue.splice(index,1)[0];
@@ -52,7 +58,7 @@ function advance(room,now){
  }
 }
 export function removeMember(room,id,now){
- room.users.delete(id);room.queue=room.queue.filter(song=>song.owner!==id);
+ leaveWerewolf(room,id,now);room.users.delete(id);room.queue=room.queue.filter(song=>song.owner!==id);
  if(room.song?.owner===id)advance(room,now);
  ensureHost(room,now);
  pauseEmptyMovie(room,now);
@@ -80,7 +86,7 @@ export function joinMember(room,{id,connectionId,token,resumeToken},now){
  }else token=resumeToken;
  member.connectionId=connectionId;member.expiresAt=now+PRESENCE_MS;
  ensureHost(room,now);
- if(room.song?.bowUntil){advance(room,now);}else if(room.mode!=='movie'&&!room.song&&room.queue.length)advance(room,now);
+ if(room.song?.bowUntil){advance(room,now);}else if(room.mode==='karaoke'&&!room.song&&room.queue.length)advance(room,now);
  return {id:member.data.id,token,events:[{takeover:{id:member.data.id,connectionId}},stateEvent(room,now)]};
 }
 
@@ -91,22 +97,28 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
  if(!member||member.connectionId!==connectionId||member.expiresAt<=now)return {expired:true,events};
  member.expiresAt=now+PRESENCE_MS;
  const data=member.data,singer=room.song?.owner===id;
- const controlReply=(accepted,error)=>({events,snapshot:snapshot(room,now),controlResult:{type:'control-result',requestId:message.requestId,accepted,error}});
+ const controlReply=(accepted,error)=>({events,snapshot:snapshot(room,now,id),controlResult:{type:'control-result',requestId:message.requestId,accepted,error}});
+ if(typeof message.type==='string'&&message.type.startsWith('ww-')){
+  const ticked=tickWerewolf(room,now);const error=werewolfCommand(room,id,message,now);if(ticked||!error)events.push(stateEvent(room,now));return controlReply(!error,error);
+ }
  switch(message.type){
   case 'room-mode':{
    if(room.hostId!==id||message.hostVersion!==room.hostVersion)return controlReply(false,'Chỉ chủ phòng hiện tại mới đổi được chế độ.');
-   if(!['movie','karaoke'].includes(message.mode))return controlReply(false,'Chế độ không hợp lệ.');
+   if(isWerewolfRunning(room))return controlReply(false,'Hãy kết thúc ván Ma Sói trước khi đổi chế độ.');
+   if(!['movie','karaoke','werewolf'].includes(message.mode))return controlReply(false,'Chế độ không hợp lệ.');
    room.mediaVersion++;
-   if(message.mode==='movie'&&room.mode!=='movie'){
+   if(message.mode==='werewolf'){if(room.mode!=='werewolf'){if(room.song)room.pendingMode='werewolf';else enterWerewolf(room,now);}}
+   else if(message.mode==='movie'&&room.mode!=='movie'){
     if(room.song)room.pendingMode='movie';else enterMovies(room,now);
    }else if(message.mode==='karaoke'){
     room.pendingMode=null;room.pendingMovie=null;
-    if(room.mode==='movie'){room.mode='karaoke';room.movie=null;room.movieVoiceKey=null;for(const member of room.users.values())member.data.mic=false;advance(room,now);}
+    if(room.mode==='movie'||room.mode==='werewolf'){room.mode='karaoke';room.movie=null;room.movieVoiceKey=null;for(const member of room.users.values())member.data.mic=false;advance(room,now);}
    }
    events.push(stateEvent(room,now));return controlReply(true);
   }
   case 'movie-select':{
    if(room.hostId!==id||message.hostVersion!==room.hostVersion)return controlReply(false,'Quyền chủ phòng đã thay đổi. Hãy chọn lại phim.');
+   if(isWerewolfRunning(room))return controlReply(false,'Hãy kết thúc ván Ma Sói trước khi chọn phim.');
    if(!resolvedMovie)return controlReply(false,'Chưa lấy được nguồn phim. Hãy chọn lại phim.');
    if(expectedMediaVersion!==undefined&&expectedMediaVersion!==room.mediaVersion)return controlReply(false,'Chế độ hoặc phim đã thay đổi trong lúc tải. Hãy chọn lại phim.');
    room.mediaVersion++;
@@ -150,15 +162,19 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
    if(room.chat.some(entry=>entry.userId===id&&entry.clientId===message.clientId))return {events};
    if(Number.isFinite(member.chatAt)&&now-member.chatAt<500)return {events:[{to:id,message:{type:'error',message:'Bạn gửi hơi nhanh. Chờ một chút rồi gửi tiếp nhé.'}}]};
    member.chatAt=now;
-   const entry={id:randomUUID(),clientId:message.clientId,userId:id,name:data.name,text,at:now};
+   const channel=room.mode==='werewolf'?chatChannel(room,id):'public';
+   if(!channel)return {events:[{to:id,message:{type:'error',message:'Ban đêm vai của bạn không được nhắn tin. Hãy chờ ban ngày.'}}]};
+   const entry={id:randomUUID(),clientId:message.clientId,userId:id,name:data.name,text,at:now,...(room.mode==='werewolf'?{gameId:room.werewolf.id,channel}:{})};
    room.chat.push(entry);if(room.chat.length>MAX_CHAT_HISTORY)room.chat.splice(0,room.chat.length-MAX_CHAT_HISTORY);
-   events.push({message:{type:'chat',entry,revision:room.revision}});return {events};
+   if(room.mode==='werewolf'){for(const receiver of room.users.keys())if(readWerewolfChat(room,receiver,[entry]).length)events.push({to:receiver,message:{type:'chat',entry,overhead:channel==='day'||channel==='public',revision:room.revision}});}
+   else events.push({message:{type:'chat',entry,revision:room.revision}});return {events};
   }
-  case 'refresh':return {events,snapshot:snapshot(room,now)};
+  case 'refresh':return {events,snapshot:snapshot(room,now,id)};
   case 'heartbeat':
    if(expireMembers(room,now))events.push(stateEvent(room,now));
-   return {events,snapshot:snapshot(room,now)};
+   return {events,snapshot:snapshot(room,now,id)};
   case 'move':{
+   if(room.mode==='werewolf')return {events};
    const {x,z,yaw,bodyYaw,pitch,gait}=message;
    if(![x,z,yaw,pitch].every(Number.isFinite))return {events};
    if(bodyYaw!==undefined&&!Number.isFinite(bodyYaw))return {events};
@@ -176,6 +192,7 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
    data.jumpAt=now;data.emoteAt=0;events.push({message:{type:'pose',user:{...data},revision:room.revision}});return {events};
   case 'emote':return {events};
   case 'voice-session':
+   if(room.mode==='werewolf'){const voice=werewolfVoice(room,id);return {events,voice:voice?.key===message.key?voice:null};}
    return {events,voice:room.mode==='movie'&&message.key===room.movieVoiceKey?{key:room.movieVoiceKey,group:true}:room.song&&message.key===room.song.key?{key:room.song.key,owner:room.song.owner}:null};
   case 'signal':
    if(room.users.has(message.to)&&(singer||message.to===room.song?.owner))events.push({to:message.to,message:{type:'signal',from:id,signal:message.signal,revision:room.revision}});
@@ -199,7 +216,7 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
    if(data.seat>=0)Object.assign(data,{bodyYaw:0,yaw:0,pitch:0});break;
   case 'queue':{
    const requestId=typeof message.requestId==='string'&&/^[\w-]{8,64}$/.test(message.requestId)?message.requestId:undefined;
-   const reply=(accepted,error,key)=>({events,snapshot:snapshot(room,now),queueResult:requestId?{type:'queue-result',requestId,accepted,error,key}:null});
+   const reply=(accepted,error,key)=>({events,snapshot:snapshot(room,now,id),queueResult:requestId?{type:'queue-result',requestId,accepted,error,key}:null});
    if(typeof message.video!=='string'||! /^[\w-]{11}$/.test(message.video))return reply(false,'Liên kết video không hợp lệ.');
    member.queueRequests??=[];
    const existing=requestId&&member.queueRequests.find(item=>item.requestId===requestId);
@@ -234,7 +251,7 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
    if(!singer||message.key!==room.song.key||message.video!==room.song.video||!Number.isFinite(message.duration)||message.duration<=0||message.duration>21600)return {events};
    if(room.song.duration===message.duration)return {events};
    room.song.duration=message.duration;if(!Number.isFinite(room.song.pausedAt))room.song.endAt=room.song.start+message.duration*1000;break;
-  case 'mic':if(!singer&&room.mode!=='movie')return {events};data.mic=!!message.on;break;
+  case 'mic':if(room.mode==='werewolf'&&!werewolfVoice(room,id))return {events};if(!singer&&!['movie','werewolf'].includes(room.mode))return {events};data.mic=!!message.on;break;
   case 'leave':removeMember(room,id,now);break;
   default:return {events};
  }
