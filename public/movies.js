@@ -21,6 +21,7 @@ export function createMovies({getId,send,sendControl,getTarget,now,notice,onBloc
  $('#mode-movie').onclick=()=>command('room-mode',{mode:'movie'});
  $('#mode-karaoke').onclick=()=>command('room-mode',{mode:'karaoke'});
  $('#movie-play').onclick=()=>{if(!state.movie)return;unlockAudio();if(state.movie.paused)player.unlock(true);control({paused:!state.movie.paused});};
+ for(const [selector,delta] of [['#movie-back',-15],['#movie-forward',15]])$(selector).onclick=()=>{if(!connected||state.hostId!==getId()||!state.movie)return;control({paused:state.movie.paused,delta});};
  $('#movie-seek').oninput=()=>{$('#movie-seek-value').textContent=format(Number($('#movie-seek').value));};
  $('#movie-seek').onchange=()=>{if(state.movie)control({paused:state.movie.paused,position:Number($('#movie-seek').value)});};
  $('#movie-retry').onclick=()=>{$('#movie-error').textContent='';$('#movie-retry').hidden=true;player.retry();};
@@ -42,6 +43,7 @@ export function createMovies({getId,send,sendControl,getTarget,now,notice,onBloc
   $('#movie-watch').hidden=!active;$('#movie-controls').hidden=!active;
   $('#movie-now').textContent=state.movie?state.movie.title+' · '+state.movie.server+' · Tập '+state.movie.episode:state.pendingMovie?'Chờ chiếu: '+state.pendingMovie.title:'Chưa chọn phim.';
   $('#movie-play').disabled=!connected||!mine||!state.movie;$('#movie-play').textContent=state.movie?.paused?'▶ Phát phim':'⏸ Tạm dừng';
+  $('#movie-back').disabled=$('#movie-forward').disabled=!connected||!mine||!state.movie;
   $('#movie-seek').disabled=!connected||!mine||!state.movie?.duration;
   $('#movie-seek').max=state.movie?.duration||0;
   $('#movie-fullscreen').disabled=!state.movie;

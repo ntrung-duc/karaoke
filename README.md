@@ -17,7 +17,7 @@ Người đầu tiên vào phòng là chủ phòng 👑, có thể trao quyền 
 
 - Tìm tên bài trên YouTube hoặc dán link video, bấm **Thêm vào hàng đợi / Đăng ký lượt hát** và chờ xác nhận **Đã thêm**.
 - Mọi người lần lượt lên hát theo hàng đợi; chưa có song ca. Đến lượt, avatar tự lên sân khấu và web thử bật mic sau khi có quyền trình duyệt.
-- Người hát xem màn hình lời riêng, kiểm tra **Phòng hát → Âm lượng mic**, rồi bấm **▶ Bắt đầu hát**. Người hát có quyền tạm dừng/tiếp tục và bỏ qua bài; hết bài tự chuyển lượt.
+- Người hát xem màn hình lời riêng, kiểm tra **Phòng hát → Âm lượng mic**, rồi bấm **▶ Bắt đầu hát**. Người hát có quyền tạm dừng/tiếp tục, lùi/tiến **15 giây** bằng nút **↶15 / 15↷** và bỏ qua bài; hết bài tự chuyển lượt. Tua cập nhật cho cả phòng và giữ trạng thái phát/tạm dừng.
 - Mỗi máy tự tải video YouTube; web điều chỉnh đồng bộ thời điểm phát, không lưu video YouTube vào phòng. Giọng hát đi qua LiveKit khi cấu hình đầy đủ.
 - Mặc định nhạc **30%**, giọng hát **100%**, bù trễ người nghe **650 ms**; lựa chọn đã lưu trên máy được giữ lại. Âm lượng nghe là thiết lập cá nhân, không giảm mic gửi đến người khác. Người hát có thể chỉnh độ vang gửi ra phòng.
 - Khán giả bấm **🌹** cạnh thanh chat để cổ vũ. Nên dùng tai nghe để tránh vọng nhạc vào mic.
@@ -25,7 +25,7 @@ Người đầu tiên vào phòng là chủ phòng 👑, có thể trao quyền 
 ## Xem phim
 
 - Mở **Chọn bài / Phim → Tìm và chọn phim**, tìm tên hoặc dán link KKPhim, chọn phiên bản/tập. Chủ phòng bấm **Chiếu phim này cho cả phòng** rồi **Phát phim**.
-- Chủ phòng điều khiển phát, tạm dừng và tua chung. Trên điện thoại, thanh thời gian nằm trong **Phòng hát** để không che cảnh.
+- Chủ phòng điều khiển phát, tạm dừng và tua chung: nút **↶15 / 15↷** lùi/tiến 15 giây, thanh thời gian chọn vị trí bất kỳ. Trên điện thoại, thanh thời gian nằm trong **Phòng hát** để không che cảnh.
 - Màn chiếu được mở rộng, ẩn mic sân khấu và đèn rọi. Mỗi người có thể tự bật mic trò chuyện trong **Phòng hát**.
 - Chọn phim khi có người hát sẽ chờ hết bài. Hàng đợi karaoke được giữ; chủ phòng chọn **Phòng hát → Karaoke** để quay về hát.
 - Nguồn phim có thể lỗi hoặc giới hạn vùng; mỗi máy có nút tải lại/bắt kịp phim. Chưa hỗ trợ tự trích video từ link trang bất kỳ.

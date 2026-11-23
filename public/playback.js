@@ -9,16 +9,20 @@ export function createVoiceDelay(storage){
 // Fixed audience offset, applied at song entry, explicit pause/resume or when
 // the listener changes it. Periodic state updates never seek a playing video.
 export function createVideoSync(){
- let key=null,paused=false,holding=false,appliedDelay=0,lastSeek=-Infinity,stableAt=0;
+ let key=null,seekVersion=0,paused=false,holding=false,appliedDelay=0,lastSeek=-Infinity,stableAt=0;
  return {sync({song,id,player,now,delayMs=0,position=null}){
   if(!song){if(key!==null)player.stopVideo();key=null;paused=holding=false;return false;}
   const audience=song.owner!==id,delay=audience&&Number.isFinite(delayMs)?Math.max(0,Math.min(2000,delayMs))/1000:0;
   const sample=audience&&position?.key===song.key&&position.start===song.start&&now-position.at>=0&&now-position.at<6000?position:null;
   const source=sample?sample.position+(sample.state===1?Math.max(0,now-sample.at)/1000:0):songElapsed(song,now),target=Math.max(0,source-delay),manual=Number.isFinite(song.pausedAt),wait=audience&&source<delay;
-  if(key!==song.key){lastSeek=now;stableAt=0;key=song.key;paused=manual;holding=wait;appliedDelay=delay;const video={videoId:song.video,startSeconds:target};if(manual||wait)player.cueVideoById(video);else player.loadVideoById(video);return true;}
+  if(key!==song.key){lastSeek=now;stableAt=0;key=song.key;seekVersion=song.seekVersion||0;paused=manual;holding=wait;appliedDelay=delay;const video={videoId:song.video,startSeconds:target};if(manual||wait)player.cueVideoById(video);else player.loadVideoById(video);return true;}
   if(player.getVideoData()?.video_id!==song.video)return false;
   const state=player.getPlayerState(),resume=(paused&&!manual)||(holding&&!wait),delayChanged=appliedDelay!==delay;
   paused=manual;holding=wait;appliedDelay=delay;
+  if(seekVersion!==(song.seekVersion||0)){
+   seekVersion=song.seekVersion||0;lastSeek=now;stableAt=0;player.seekTo(target,true);
+   if(manual||wait)player.pauseVideo();else player.playVideo();return false;
+  }
   if(manual||wait){if(state===1)player.pauseVideo();return false;}
   if(resume){player.seekTo(target,true);player.playVideo();return false;}
   if(delayChanged&&audience){lastSeek=now;player.seekTo(target,true);}

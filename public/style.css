@@ -114,3 +114,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 /* TikTok stays inside the room menu; no extra overlay on mobile. */
 #tiktok-form .controls{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}#tiktok-form .controls button{flex:1;min-width:110px}#tiktok-status{font-size:13px;overflow-wrap:anywhere}.tiktok-message{border-left:3px solid #58e7df;padding-left:10px}.tiktok-message .chat-meta strong{color:#80eee8}
+
+.movie-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}#room #movie-controls .movie-actions{grid-column:1/-1}#room #movie-controls .movie-actions button{min-width:40px;flex:1}#singer-controls #singer-back .control-icon,#singer-controls #singer-forward .control-icon{font-size:15px;white-space:nowrap}

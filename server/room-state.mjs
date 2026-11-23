@@ -129,8 +129,8 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
   }
   case 'movie-playback':{
    if(room.mode!=='movie'||room.hostId!==id||message.hostVersion!==room.hostVersion||room.movie?.key!==message.key)return controlReply(false,'Chỉ chủ phòng mới điều khiển được phim hiện tại.');
-   if(typeof message.paused!=='boolean'||message.position!==undefined&&(!Number.isFinite(message.position)||message.position<0||message.position>86400))return controlReply(false,'Vị trí phim không hợp lệ.');
-   room.movie.position=message.position??moviePosition(room.movie,now);room.movie.paused=message.paused;room.movie.updatedAt=now;
+   if(typeof message.paused!=='boolean'||message.position!==undefined&&(!Number.isFinite(message.position)||message.position<0||message.position>86400)||message.delta!==undefined&&(![-15,15].includes(message.delta)||message.position!==undefined))return controlReply(false,'Vị trí phim không hợp lệ.');
+   room.movie.position=Math.min(room.movie.duration||86400,Math.max(0,message.delta!==undefined?moviePosition(room.movie,now)+message.delta:message.position??moviePosition(room.movie,now)));room.movie.paused=message.paused;room.movie.updatedAt=now;
    events.push(stateEvent(room,now));return controlReply(true);
   }
   case 'movie-duration':
@@ -234,11 +234,19 @@ export function applyMessage(room,id,connectionId,message,now,{resolvedMovie,exp
   case 'next':
    if(!singer||message.key!==room.song?.key)return controlReply(false,'Lượt hát đã thay đổi hoặc bạn không phải người đang hát.');
    advance(room,now);events.push(stateEvent(room,now));return controlReply(true);
+  case 'seek':{
+   if(room.mode!=='karaoke'||!singer||message.key!==room.song?.key)return controlReply(false,'Chỉ người đang đến lượt hát mới tua được bài hiện tại.');
+   if(!Number.isFinite(message.position)||message.position<0||message.position>21600)return controlReply(false,'Vị trí bài hát không hợp lệ.');
+   const target=Math.min(room.song.duration||21600,message.position),paused=Number.isFinite(room.song.pausedAt);
+   room.song.start=now-target*1000;if(paused)room.song.pausedAt=now;else if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;
+   room.song.seekVersion=(room.song.seekVersion||0)+1;delete room.song.playhead;delete room.song.buffering;
+   events.push(stateEvent(room,now));return controlReply(true);
+  }
   case 'playback':{
    if(!singer||message.key!==room.song?.key||typeof message.paused!=='boolean')return controlReply(false,'Không điều khiển được lượt hát hiện tại.');
    const paused=Number.isFinite(room.song.pausedAt);if(paused===message.paused)return controlReply(true);
    if(message.paused){room.song.pausedAt=now;delete room.song.endAt;}
-   else{room.song.start=room.song.awaitingStart?now:room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
+   else{room.song.start=room.song.start+Math.max(0,now-room.song.pausedAt);delete room.song.pausedAt;delete room.song.awaitingStart;if(room.song.duration)room.song.endAt=room.song.start+room.song.duration*1000;}
    delete room.song.playhead;delete room.song.buffering;
    events.push(stateEvent(room,now));return controlReply(true);
   }
