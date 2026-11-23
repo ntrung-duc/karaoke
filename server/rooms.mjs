@@ -7,14 +7,16 @@ import {joinMember,applyMessage,disconnectMember,snapshot,finishSong,expireMembe
 import {createYouTubeSearch,YouTubeSearchError} from './youtube-search.mjs';
 import {createMovieCatalog} from './movie-catalog.mjs';
 import {tickWerewolf} from './werewolf.mjs';
+import {createTikTokChat} from './tiktok-chat.mjs';
 
 // The configured store owns room state: RAM with Redis checkpoints on a single
 // server, or Redis transactions and Pub/Sub when multiple servers are required.
-export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,movieCatalog=createMovieCatalog(),resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
+export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,livekitApiSecret,ice=[],store,redisUrl,redisPrefix,youtubeApiKey,tiktokConnector,tiktokSignApiKey,movieCatalog=createMovieCatalog(),resumeGraceMs=RESUME_GRACE_MS,rotateAfterMs=0,heartbeatMs=20000,now=Date.now}={}){
  if(!store){const backend=redisUrl?createRedisStore({url:redisUrl,prefix:redisPrefix}):null;store=backend?(stateMode==='local'?createLocalRoomStore(backend):backend):createMemoryStore();}
  const searchYouTube=createYouTubeSearch({store,apiKey:youtubeApiKey,now});
  const livekit=!!(livekitUrl&&livekitApiKey&&livekitApiSecret);
  const clients=new Set(),channels=new Map();let stopping=false;
+ const tiktok=createTikTokChat({connector:tiktokConnector,signApiKey:tiktokSignApiKey,now,emit:(key,message)=>{for(const record of channels.get(key)?.clients||[])if(record.ready&&!record.closed)send(record,message);}});
  function scheduleWerewolf(record,state){
   const channel=record.channel,g=state.werewolf,deadline=g?.until,version=deadline?g.id+':'+g.version:null;
   if(!channel||channel.werewolfVersion===version)return;channel.werewolfVersion=version;clearTimeout(channel.werewolfTimer);
@@ -93,6 +95,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
   const channel=record.channel;if(!channel)return;
   channel.clients.delete(record);
   if(channel.clients.size===0&&channels.get(record.key)===channel){
+   tiktok.stop(record.key,false);
    clearTimeout(channel.endTimer);clearTimeout(channel.hostTimer);clearTimeout(channel.werewolfTimer);
    channel.closing=(async()=>{
     const unsubscribe=await channel.ready;await unsubscribe();
@@ -122,6 +125,20 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
      record.clockAt=now();send(record,{type:'clock',seq:message.seq,serverTime:now()});
     }
     return;
+   }
+   if(message.type==='tiktok-connect'||message.type==='tiktok-disconnect'){
+    if(!record.ready||!record.id||typeof message.requestId!=='string'||! /^[\w-]{1,64}$/.test(message.requestId))return;
+    if(record.tiktokBusy||Number.isFinite(record.tiktokAt)&&now()-record.tiktokAt<2000){send(record,{type:'tiktok-result',requestId:message.requestId,error:'Chờ một chút rồi thử lại.'});return;}
+    record.tiktokBusy=true;record.tiktokAt=now();
+    enqueue(async()=>{
+     try{
+      if(record.closed)return;
+      const auth=await store.transact(key,room=>({allowed:room.hostId===record.id&&room.hostVersion===message.hostVersion&&room.users.get(record.id)?.connectionId===record.connectionId&&room.users.get(record.id)?.expiresAt>now()}));
+      if(record.closed)return;
+      const result=!auth.allowed?{error:'Chỉ chủ phòng hiện tại mới kết nối hoặc ngắt TikTok LIVE.'}:message.type==='tiktok-connect'?tiktok.start(key,message.username):(tiktok.stop(key),{});
+      send(record,{type:'tiktok-result',requestId:message.requestId,...result});
+     }finally{record.tiktokBusy=false;}
+    });return;
    }
    // Playback samples are ephemeral: never queue behind Redis movement writes.
    if(message.type==='video-position'){
@@ -216,6 +233,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
    if(record.closed)return;
    send(record,{type:'hello',id:result.id,ice,voiceTransport:livekit?'livekit':'p2p',resumeToken:result.token});record.ready=true;
    receive(record,{message:result.snapshot});for(const event of record.buffer.splice(0))receive(record,event);
+   send(record,{type:'tiktok-status',...tiktok.status(key)});
    record.heartbeat=setInterval(()=>{
     if(!record.alive){record.missedPongs=(record.missedPongs||0)+1;if(record.missedPongs>=3){client.terminate();return;}}
     record.alive=false;client.ping();
@@ -232,7 +250,7 @@ export function createRoomService({stateMode='shared',livekitUrl,livekitApiKey,l
  return {
   join,ready:()=>store.ready(),
   async close(){
-   stopping=true;stopUnavailable();
+   stopping=true;stopUnavailable();tiktok.close();
    const current=[...clients];for(const r of current){clearInterval(r.heartbeat);clearTimeout(r.rotation);r.client.terminate();}
    await Promise.all(current.map(r=>r.pending));
    for(const channel of channels.values()){clearTimeout(channel.endTimer);clearTimeout(channel.hostTimer);await channel.ready.then(stop=>stop()).catch(()=>{});}

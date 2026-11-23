@@ -12,6 +12,7 @@ export function readConfig(env = process.env) {
     stateMode: env.ROOM_STATE_MODE || (env.VERCEL ? 'shared' : 'local'),
     redisUrl: env.REDIS_URL || undefined,
     youtubeApiKey: env.YOUTUBE_API_KEY || undefined,
+    tiktokSignApiKey: env.EULERSTREAM_API_KEY || undefined,
     redisPrefix: env.REDIS_PREFIX || (env.VERCEL ? `karaoke:v1:${env.VERCEL_ENV||'development'}${env.VERCEL_ENV==='preview'?':'+(env.VERCEL_GIT_COMMIT_REF||'preview'):''}` : 'karaoke:v1'),
     rotateAfterMs: env.VERCEL ? 240000 : 0,
     ice: env.TURN_URL ? [{urls: env.TURN_URL, username: env.TURN_USER, credential: env.TURN_PASSWORD}] : [],

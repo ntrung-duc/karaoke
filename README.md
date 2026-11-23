@@ -17,6 +17,7 @@ Mở [http://localhost:4173](http://localhost:4173). Giữ cửa sổ máy chủ
 ## Tài liệu
 
 - [Hướng dẫn sử dụng](docs/HUONG_DAN_SU_DUNG.md): vào phòng, đi/chạy/nhảy, chọn bài, bật mic và xử lý lỗi.
+- [Kết nối chat TikTok LIVE](docs/TIKTOK_LIVE.md): admin kết nối kênh đang LIVE, hiển thị bình luận và xử lý mất kết nối.
 - [Đánh giá kiến trúc](docs/KIEN_TRUC.md): sơ đồ thành phần, trách nhiệm từng file, giới hạn và lộ trình mở rộng.
 - [Hướng dẫn phát triển](docs/PHAT_TRIEN.md): cấu hình, kiểm thử, thêm tính năng, thay avatar và triển khai.
 - [Nguồn mô hình và animation](public/assets/README.md): xuất xứ, giấy phép và cách tạo lại GLB.

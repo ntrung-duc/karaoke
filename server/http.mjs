@@ -13,6 +13,7 @@ const files = new Map([
   ['/turn-state.js', 'public/turn-state.js'],
   ['/song-queue.js', 'public/song-queue.js'],
   ['/room-host.js', 'public/room-host.js'],
+  ['/tiktok-chat.js', 'public/tiktok-chat.js'],
   ['/werewolf.js', 'public/werewolf.js'],
   ['/werewolf-rules.js', 'public/werewolf-rules.js'],
   ['/werewolf-scene.js', 'public/werewolf-scene.js'],

@@ -5,6 +5,7 @@
     "livekit-server-sdk": "^2.20.0",
     "redis": "^6.3.1",
     "three": "^0.187.0",
+    "tiktok-live-connector": "2.5.0",
     "ws": "^8.23.0"
   },
   "name": "rap-am",
